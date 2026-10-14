@@ -13,6 +13,7 @@ Build a production-minded, demo-ready React + Django web app that compares up to
 ```
 CLAUDE.md                          project-wide instructions (this file)
 .claude/skills/weather-routing/    domain skill: risk, sampling, ranking, heatmap
+.claude/skills/pr-review/          review checklist: layering, invariants, quality gates, report format
 backend/                           Django + DRF API
   config/                          settings (env-driven), urls, wsgi
   routing/                         Django app: views, serializers, urls
@@ -79,7 +80,8 @@ Units: wind mph (sustained 10 m), rain in/hr, snow in/hr (snowfall rate). Conver
 - Read `.claude/skills/weather-routing/SKILL.md` before changing risk, sampling, ETA, recommendation or heatmap logic.
 - Pure functions for business logic; compare thresholds on exact values (no pre-rounding) and test the listed edge values.
 - HERE critical notices (e.g. `violatedVehicleRestriction`) are surfaced as route warnings, never hidden.
-- Provider calls: timeouts (`PROVIDER_CONNECT_TIMEOUT_S`, `PROVIDER_READ_TIMEOUT_S`), at most `PROVIDER_MAX_RETRIES` retries with backoff on 429/5xx/timeouts only, mapped to typed errors and HTTP 502/503/504 with a useful message.
+- Provider calls: timeouts (`PROVIDER_CONNECT_TIMEOUT_S`, `PROVIDER_READ_TIMEOUT_S`), at most `PROVIDER_MAX_RETRIES` retries with backoff on timeouts, connection errors, 5xx and 429-with-short-Retry-After only (never TLS or malformed-URL errors), within a per-call budget (`PROVIDER_CALL_BUDGET_S`); mapped to typed errors and HTTP 502/503/504 with a useful message.
+- Forecast windows are sized with `forecast_hours_needed()` (hour-aligned, as Open-Meteo counts from the current hour); never compute them inline.
 - Tests never hit the network: use fakes and recorded fixtures.
 - Avoid unnecessary abstractions, dependencies, background jobs and extra features.
 

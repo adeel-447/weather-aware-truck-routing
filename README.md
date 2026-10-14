@@ -76,7 +76,7 @@ Error statuses: 400 invalid request; 422 place/route not found or provider rejec
 - Geocoding: HERE Geocoding & Search v7.
 - Weather: Open-Meteo hourly forecast (keyless for non-commercial use), queried from 2 h before now up to 384 h ahead. Nearby points share a 0.05° grid cell and are cached for `CACHE_TIMEOUT_S`.
 - **Open-Meteo free-tier quota:** 600 calls/min, 5,000/hour, 10,000/day, and each location counts as a call (observed). A trip costs roughly one call per unique checkpoint location plus up to `HEATMAP_MAX_CELLS` for the heatmap (~300 total for a 1,000-mile trip at 25-mile spacing). Rate-limit responses surface as `provider_rate_limited`. Repeat views within `CACHE_TIMEOUT_S` are served from cache. Production use needs an Open-Meteo API key.
-- Configure via `.env` (see `.env.example`): `HERE_API_KEY`, `ROUTE_ALTERNATIVES`, `GEOCODE_COUNTRY_CODES`, `TRUCK_EMPTY_WEIGHT_LB`, timeouts and retries. Without `HERE_API_KEY`, routing/geocoding return a clear 503 "not configured" error.
+- Configure via `.env` (see `.env.example`): `HERE_API_KEY`, `ROUTE_ALTERNATIVES`, `GEOCODE_COUNTRY_CODES`, `TRUCK_EMPTY_WEIGHT_LB`, `HEATMAP_MAX_CELLS`, cache size (`CACHE_MAX_ENTRIES`), timeouts, retries and the per-call time budget (`PROVIDER_CALL_BUDGET_S`). Retries cover timeouts, connection errors, 5xx and rate limits with a short Retry-After; TLS and URL errors fail fast. Without `HERE_API_KEY`, routing/geocoding return a clear 503 "not configured" error.
 - Map tiles: OpenFreeMap (no key).
 
 ## Assumptions and interpretation of the risk rules
