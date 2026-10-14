@@ -101,3 +101,37 @@ describe('map layers', () => {
     expect(map.sources.size).toBe(0)
   })
 })
+
+describe('route and checkpoint clicks', () => {
+  it('does not change the selected route when a checkpoint marker is clicked', () => {
+    const onSelect = vi.fn()
+    render(
+      <MapView>
+        <RouteLayers
+          routes={evaluation.routes}
+          colorIndex={colors}
+          selectedRouteId="A"
+          hoveredRouteId={null}
+          fitKey="one"
+          onSelect={onSelect}
+          onHover={vi.fn()}
+        />
+        <CheckpointLayer route={evaluation.routes[0]!} timeZone="UTC" focus={null} />
+      </MapView>,
+    )
+    act(() => {
+      lastMap().emit('load')
+    })
+    const map = lastMap()
+    const routeClick = { point: { x: 1, y: 1 }, features: [{ properties: { id: 'B' } }] }
+    map.queryRenderedFeatures.mockReturnValueOnce([{ id: 0 }])
+    act(() => {
+      map.emit('click:routes-line', routeClick)
+    })
+    expect(onSelect).not.toHaveBeenCalled()
+    act(() => {
+      map.emit('click:routes-line', routeClick)
+    })
+    expect(onSelect).toHaveBeenCalledWith('B')
+  })
+})

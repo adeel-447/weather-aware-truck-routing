@@ -7,7 +7,8 @@ import type { Checkpoint, RouteResult, SeverityOrUnknown } from '../types/api'
 import { useMap } from './MapContext'
 
 const SOURCE = 'checkpoints'
-const LAYER = 'checkpoints-circle'
+export const CHECKPOINT_LAYER = 'checkpoints-circle'
+const LAYER = CHECKPOINT_LAYER
 
 interface Props {
   route: RouteResult | null

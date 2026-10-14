@@ -240,6 +240,11 @@ h2 {
   margin-top: 1.25rem;
 }
 
+.results--stale {
+  opacity: 0.55;
+  transition: opacity 150ms;
+}
+
 .results__section {
   display: grid;
   gap: 0.6rem;

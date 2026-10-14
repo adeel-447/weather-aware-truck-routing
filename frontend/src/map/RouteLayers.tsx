@@ -7,6 +7,7 @@ import {
 import { useEffect, useEffectEvent } from 'react'
 
 import { routeColor } from '../theme'
+import { CHECKPOINT_LAYER } from './CheckpointLayer'
 import type { RouteResult } from '../types/api'
 import { useMap } from './MapContext'
 
@@ -94,6 +95,11 @@ export function RouteLayers({
     })
 
     const click = (event: MapLayerMouseEvent) => {
+      // A checkpoint marker drawn over a route line handles its own click (opens its popup).
+      const onCheckpoint =
+        map.getLayer(CHECKPOINT_LAYER) !== undefined &&
+        map.queryRenderedFeatures(event.point, { layers: [CHECKPOINT_LAYER] }).length > 0
+      if (onCheckpoint) return
       const id = event.features?.[0]?.properties.id as string | undefined
       if (id) select(id)
     }

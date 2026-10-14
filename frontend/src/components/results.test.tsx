@@ -104,3 +104,20 @@ describe('WarningList', () => {
     expect(screen.queryByText(/No Travel conditions at the/)).not.toBeInTheDocument()
   })
 })
+
+describe('safety display uses backend eligibility', () => {
+  it('lists a No Travel route even when its rounded mileage is 0', () => {
+    const evaluation = evaluationFixture()
+    const routeB = evaluation.routes.find((r) => r.id === 'B')!
+    routeB.severity_miles.no_travel = 0 // e.g. 0.004 mi rounded by the API
+    render(<RecommendationBanner evaluation={evaluation} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('Route B: less than 0.1 mi under No Travel')
+  })
+
+  it('renders only phrasing content inside route card buttons', () => {
+    renderComparison()
+    for (const card of screen.getAllByRole('button', { name: /Route [ABC]/ })) {
+      expect(card.querySelector('div, p, ul, section')).toBeNull()
+    }
+  })
+})

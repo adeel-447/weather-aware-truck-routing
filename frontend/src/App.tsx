@@ -21,11 +21,13 @@ function defaultSelection(evaluation: EvaluateResponse): string | null {
 
 export default function App() {
   const evaluate = useEvaluateRoutes()
+  // The last successful result is kept in state: TanStack Query v5 clears mutation data while a new
+  // request is pending, which would unmount the map layers and blank the panel on every re-submit.
+  const [evaluation, setEvaluation] = useState<EvaluateResponse | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [hoveredRouteId, setHoveredRouteId] = useState<string | null>(null)
   const [focus, setFocus] = useState<{ index: number } | null>(null)
 
-  const evaluation = evaluate.data
   const selectedRoute = evaluation?.routes.find((r) => r.id === selectedRouteId) ?? null
   // Colours follow the provider's route ids, so a route keeps its colour regardless of rank.
   const colorIndex = useMemo(
@@ -37,17 +39,23 @@ export default function App() {
   )
 
   const error = evaluate.error
-  const fieldErrors =
-    error instanceof ApiError && error.code === 'invalid_request'
-      ? serverFieldErrors(error.fields)
-      : undefined
+  // Memoized so TripForm sees a new object only when a new error arrives.
+  const fieldErrors = useMemo(
+    () =>
+      error instanceof ApiError && error.code === 'invalid_request'
+        ? serverFieldErrors(error.fields)
+        : undefined,
+    [error],
+  )
   const hasFieldErrors = fieldErrors !== undefined && Object.keys(fieldErrors).length > 0
   const errorMessage = error && !hasFieldErrors ? error.message : null
+  const isRefreshing = evaluate.isPending && evaluation !== null
 
   function submit(request: EvaluateRequest) {
     setFocus(null)
     evaluate.mutate(request, {
       onSuccess: (result) => {
+        setEvaluation(result)
         setSelectedRouteId(defaultSelection(result))
         setHoveredRouteId(null)
       },
@@ -75,11 +83,16 @@ export default function App() {
           <div className="banner banner--danger" role="alert">
             <strong>Could not evaluate routes</strong>
             <p>{errorMessage}</p>
+            {evaluation && <p>The previous results are still shown below.</p>}
           </div>
         )}
 
         {evaluation && (
-          <div className="results" aria-live="polite">
+          <div
+            className={`results${isRefreshing ? ' results--stale' : ''}`}
+            aria-live="polite"
+            aria-busy={isRefreshing}
+          >
             <RecommendationBanner evaluation={evaluation} />
             <RouteComparison
               evaluation={evaluation}

@@ -7,12 +7,12 @@ interface Props {
   total: number
 }
 
-/** Stacked bar of route miles by severity. */
+/** Stacked bar of route miles by severity. Spans only: it is rendered inside a <button>. */
 export function SeverityBar({ miles, total }: Props) {
   const parts = SEVERITY_ORDER.filter((s) => miles[s] > 0)
   const label = parts.map((s) => `${SEVERITY_LABELS[s]} ${formatMiles(miles[s])}`).join(', ')
   return (
-    <div className="severity-bar" role="img" aria-label={`Miles by risk: ${label}`}>
+    <span className="severity-bar" role="img" aria-label={`Miles by risk: ${label}`}>
       {parts.map((severity) => (
         <span
           key={severity}
@@ -23,6 +23,6 @@ export function SeverityBar({ miles, total }: Props) {
           }}
         />
       ))}
-    </div>
+    </span>
   )
 }

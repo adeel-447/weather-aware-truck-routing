@@ -37,6 +37,7 @@ export class FakeMap {
     this.layers.delete(id)
   })
   setFeatureState = vi.fn()
+  queryRenderedFeatures = vi.fn((): unknown[] => [])
   setLayoutProperty = vi.fn()
   fitBounds = vi.fn()
   easeTo = vi.fn()

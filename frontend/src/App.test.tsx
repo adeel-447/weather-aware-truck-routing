@@ -98,3 +98,34 @@ describe('App', () => {
     expect(alert).toHaveTextContent('HERE_API_KEY is not configured')
   })
 })
+
+describe('App re-evaluation', () => {
+  it('keeps the previous results visible while re-evaluating and after a failure', async () => {
+    let respond: (r: Response) => void = () => undefined
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(evaluationFixture()), { status: 200 }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (respond = resolve)))
+    vi.stubGlobal('fetch', fetchMock)
+    renderApp()
+    await fillAndSubmit()
+    expect(await screen.findByText('Recommended: Route A')).toBeInTheDocument()
+    const sourcesBefore = lastMap().addSource.mock.calls.length
+
+    await userEvent.click(screen.getByRole('button', { name: 'Compare routes' }))
+    expect(screen.getByRole('button', { name: 'Evaluating routes…' })).toBeDisabled()
+    expect(screen.getByText('Recommended: Route A')).toBeInTheDocument() // still shown while pending
+
+    respond(
+      new Response(
+        JSON.stringify({
+          error: { code: 'provider_timeout', message: 'request timed out', provider: 'HERE' },
+        }),
+        { status: 504 },
+      ),
+    )
+    expect(await screen.findByText(/previous results are still shown/)).toBeInTheDocument()
+    expect(screen.getByText('Recommended: Route A')).toBeInTheDocument()
+    expect(lastMap().addSource.mock.calls.length).toBe(sourcesBefore) // layers never re-created
+  })
+})

@@ -68,3 +68,14 @@ describe('TripForm', () => {
     expect(screen.getByText(/Weather load rules use cargo weight/)).toBeInTheDocument()
   })
 })
+
+describe('TripForm server errors', () => {
+  it('hides a server error once its field is edited', async () => {
+    setup({ serverErrors: { destination: 'origin and destination resolve to the same place' } })
+    const destination = screen.getByLabelText('Destination')
+    expect(destination).toHaveAttribute('aria-invalid', 'true')
+    await userEvent.type(destination, 'Denver, CO')
+    expect(screen.queryByText(/resolve to the same place/)).not.toBeInTheDocument()
+    expect(destination).not.toHaveAttribute('aria-invalid')
+  })
+})

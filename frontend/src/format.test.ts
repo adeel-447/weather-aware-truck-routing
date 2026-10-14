@@ -54,3 +54,16 @@ describe('time zone conversion', () => {
     )
   })
 })
+
+describe('nextHourLocal', () => {
+  it('rounds to the next local hour in zones with half-hour offsets', () => {
+    // 04:40Z = 10:10 in Asia/Kolkata (UTC+5:30) -> 11:00 local, not 10:30.
+    expect(nextHourLocal('Asia/Kolkata', new Date(Date.UTC(2026, 9, 20, 4, 40)))).toBe(
+      '2026-10-20T11:00',
+    )
+  })
+
+  it('rolls over to the next day', () => {
+    expect(nextHourLocal('UTC', new Date(Date.UTC(2026, 11, 31, 23, 5)))).toBe('2027-01-01T00:00')
+  })
+})

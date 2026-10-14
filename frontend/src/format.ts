@@ -64,9 +64,8 @@ export function zonedLocalToInstant(local: string, timeZone: string): number | n
   return guess - zoneOffsetMs(first, timeZone)
 }
 
-/** Next full hour in `timeZone`, formatted for <input type="datetime-local">. */
+/** Next full hour of the wall clock in `timeZone`, formatted for <input type="datetime-local">. */
 export function nextHourLocal(timeZone: string, now: Date = new Date()): string {
-  const next = new Date(Math.ceil((now.getTime() + 1) / 3_600_000) * 3_600_000)
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     hourCycle: 'h23',
@@ -74,8 +73,10 @@ export function nextHourLocal(timeZone: string, now: Date = new Date()): string 
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit',
-  }).formatToParts(next)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00'
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+  }).formatToParts(now)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+  // Wall-clock arithmetic in a UTC Date so day/month/year roll over correctly.
+  const next = new Date(Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') + 1))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}T${pad(next.getUTCHours())}:00`
 }

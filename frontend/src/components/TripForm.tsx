@@ -33,15 +33,31 @@ export function TripForm({ onSubmit, isSubmitting, serverErrors, initial }: Trip
   const [values, setValues] = useState<TripFormValues>(() => initial ?? initialValues())
   const [errors, setErrors] = useState<TripFormErrors>({})
   const [touchedSubmit, setTouchedSubmit] = useState(false)
+  // Server errors describe the values that were submitted, so a field's server error is hidden once
+  // the user edits that field. A new set of server errors (a new response) resets this.
+  const [seenServerErrors, setSeenServerErrors] = useState(serverErrors)
+  const [editedSinceServer, setEditedSinceServer] = useState<ReadonlySet<keyof TripFormValues>>(
+    () => new Set(),
+  )
+  if (serverErrors !== seenServerErrors) {
+    setSeenServerErrors(serverErrors)
+    setEditedSinceServer(new Set())
+  }
   const id = useId()
   const zones = COMMON_ZONES.includes(values.timezone)
     ? COMMON_ZONES
     : [values.timezone, ...COMMON_ZONES]
-  const shown: TripFormErrors = { ...serverErrors, ...errors }
+  const activeServerErrors = Object.fromEntries(
+    Object.entries(serverErrors ?? {}).filter(
+      ([key]) => !editedSinceServer.has(key as keyof TripFormValues),
+    ),
+  ) as TripFormErrors
+  const shown: TripFormErrors = { ...activeServerErrors, ...errors }
 
   function update<K extends keyof TripFormValues>(key: K, value: TripFormValues[K]) {
     const next = { ...values, [key]: value }
     setValues(next)
+    if (serverErrors?.[key]) setEditedSinceServer((prev) => new Set(prev).add(key))
     if (touchedSubmit) setErrors(validateTrip(next))
   }
 

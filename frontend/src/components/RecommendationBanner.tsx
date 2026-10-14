@@ -7,7 +7,8 @@ interface Props {
 
 export function RecommendationBanner({ evaluation }: Props) {
   const { recommendation, routes } = evaluation
-  const noTravelRoutes = routes.filter((r) => r.severity_miles.no_travel > 0)
+  // Eligibility comes from the backend (exact miles); the rounded mileage is only displayed.
+  const noTravelRoutes = routes.filter((r) => r.standing === 'no_travel')
 
   return (
     <section className="results__section" aria-label="Recommendation">
@@ -17,8 +18,11 @@ export function RecommendationBanner({ evaluation }: Props) {
           <ul>
             {noTravelRoutes.map((route) => (
               <li key={route.id}>
-                Route {route.id}: {formatMiles(route.severity_miles.no_travel)} under No Travel
-                conditions at the estimated arrival times.
+                Route {route.id}:{' '}
+                {route.severity_miles.no_travel >= 0.1
+                  ? formatMiles(route.severity_miles.no_travel)
+                  : 'less than 0.1 mi'}{' '}
+                under No Travel conditions at the estimated arrival times.
               </li>
             ))}
           </ul>
