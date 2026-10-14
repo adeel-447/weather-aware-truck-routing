@@ -1,0 +1,117 @@
+{
+ "_comment": "Synthetic fixture shaped per HERE Routing v8 OpenAPI 8.164.0 (RouterRouteResponse). Replace with a recorded response once a HERE key is available.",
+ "routes": [
+  {
+   "id": "d3f1c3a0-0000-4000-8000-00000000000a",
+   "sections": [
+    {
+     "id": "s1",
+     "type": "vehicle",
+     "departure": {
+      "time": "2026-10-20T13:00:00Z",
+      "place": {
+       "type": "place",
+       "location": {
+        "lat": 41.88,
+        "lng": -87.63
+       }
+      }
+     },
+     "arrival": {
+      "time": "2026-10-20T14:00:00Z",
+      "place": {
+       "type": "place",
+       "location": {
+        "lat": 41.6,
+        "lng": -88.5
+       }
+      }
+     },
+     "summary": {
+      "duration": 3600,
+      "length": 80000,
+      "baseDuration": 3500
+     },
+     "polyline": "BFg2z_Hvn72Q_zPv30B_wT_y6B_wT_y6B",
+     "spans": [
+      {
+       "offset": 0,
+       "length": 30000,
+       "duration": 1200
+      },
+      {
+       "offset": 1,
+       "length": 25000,
+       "duration": 1200
+      },
+      {
+       "offset": 2,
+       "length": 25000,
+       "duration": 1200
+      }
+     ],
+     "transport": {
+      "mode": "truck"
+     }
+    },
+    {
+     "id": "s2",
+     "type": "vehicle",
+     "summary": {
+      "duration": 3000,
+      "length": 70000,
+      "baseDuration": 2900
+     },
+     "polyline": "BFgg99H_kl8Q_wT_0hD_wT_0hD",
+     "spans": [
+      {
+       "offset": 0,
+       "length": 40000,
+       "duration": 1500
+      },
+      {
+       "offset": 1,
+       "length": 30000,
+       "duration": 900
+      }
+     ],
+     "notices": [
+      {
+       "title": "Route goes through a seasonal closure.",
+       "code": "seasonalClosure",
+       "severity": "info"
+      }
+     ],
+     "transport": {
+      "mode": "truck"
+     }
+    }
+   ]
+  },
+  {
+   "id": "d3f1c3a0-0000-4000-8000-00000000000b",
+   "sections": [
+    {
+     "id": "s1",
+     "type": "vehicle",
+     "summary": {
+      "duration": 8000,
+      "length": 160000,
+      "baseDuration": 7800
+     },
+     "polyline": "BFg2z_Hvn72QguXv7iE_l1D_rqH",
+     "notices": [
+      {
+       "title": "Route uses a road which is forbidden for the given vehicle profile.",
+       "code": "violatedVehicleRestriction",
+       "severity": "critical"
+      }
+     ],
+     "transport": {
+      "mode": "truck"
+     }
+    }
+   ]
+  }
+ ]
+}
