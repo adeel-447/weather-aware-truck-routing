@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from routing.domain.checkpoints import build_checkpoints
+from routing.domain.checkpoints import build_checkpoints, sample_positions
 from routing.domain.eta import TimingCurve
 from routing.domain.ranking import RecommendationStatus, RouteScore, RouteStanding, recommend
 from routing.domain.scoring import summarize
@@ -35,7 +35,11 @@ def test_mileage_uses_intervals_not_checkpoint_counts():
         return WeatherSample(60.0 if abs((eta - severe_eta).total_seconds()) < 1 else 5.0, 0.0, 0.0)
 
     checkpoints = build_checkpoints(
-        STRAIGHT, 57.3, 25, DEPARTURE, TimingCurve.proportional(57.3, 3600), lookup, load_lb=10_000
+        sample_positions(STRAIGHT, 57.3, 25),
+        DEPARTURE,
+        TimingCurve.proportional(57.3, 3600),
+        lookup,
+        load_lb=10_000,
     )
     summary = summarize(checkpoints, 57.3)
     assert summary.miles[NT] == pytest.approx(53.65 - 37.5)
@@ -48,7 +52,11 @@ def test_weighted_average_is_distance_weighted_over_known_miles():
         return WeatherSample(40.0, 0.0, 0.0) if eta == DEPARTURE else WeatherSample(None, 0.0, 0.0)
 
     checkpoints = build_checkpoints(
-        STRAIGHT, 30.0, 10, DEPARTURE, TimingCurve.proportional(30.0, 3600), lookup, load_lb=10_000
+        sample_positions(STRAIGHT, 30.0, 10),
+        DEPARTURE,
+        TimingCurve.proportional(30.0, 3600),
+        lookup,
+        load_lb=10_000,
     )
     summary = summarize(checkpoints, 30.0)
     assert summary.miles[H] == pytest.approx(5.0)  # origin owns [0, 5]
@@ -64,7 +72,13 @@ def test_checkpoints_query_weather_at_each_eta_not_departure():
         seen.append(eta)
         return CALM
 
-    build_checkpoints(STRAIGHT, 100.0, 50, DEPARTURE, TimingCurve.proportional(100.0, 7200), lookup, 10_000)
+    build_checkpoints(
+        sample_positions(STRAIGHT, 100.0, 50),
+        DEPARTURE,
+        TimingCurve.proportional(100.0, 7200),
+        lookup,
+        10_000,
+    )
     assert seen == [DEPARTURE, DEPARTURE + timedelta(hours=1), DEPARTURE + timedelta(hours=2)]
 
 
@@ -164,3 +178,10 @@ def test_recommend_rejects_empty_and_duplicate_ids():
         recommend([])
     with pytest.raises(ValueError):
         recommend([route(route_id="A"), route(route_id="A")])
+
+
+def test_average_risk_reason_shows_enough_decimals_to_differ():
+    a = route({H: 10, M: 50.12, L: 39.88}, route_id="A")
+    b = route({H: 10, M: 50.49, L: 39.51}, route_id="B")
+    reason = recommend([a, b]).reason
+    assert "lowest average risk (0.701 vs 0.705" in reason

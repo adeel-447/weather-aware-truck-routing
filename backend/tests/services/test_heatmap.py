@@ -82,3 +82,18 @@ def test_frames_beyond_forecast_are_unavailable_not_low():
     assert result["frames"][5]["available"] is True
     assert result["frames"][20]["available"] is False
     assert set(result["frames"][20]["severity"]) == {None}
+
+
+def test_heatmap_window_counts_from_current_hour():
+    # now 12:30, reference 13:00: the last frame (+48 h = 13:00 two days later) must be covered.
+    forecaster = FakeForecaster()
+    corridor_heatmap(SHORT, REFERENCE, 20_000, forecaster, now=NOW)
+    window_start = NOW.replace(minute=0)
+    hours = forecaster.calls[0][1]
+    assert window_start + timedelta(hours=hours - 1) >= REFERENCE + timedelta(hours=48)
+
+
+def test_default_cell_cap_matches_configured_default():
+    from django.conf import settings
+
+    assert MAX_CELLS == settings.HEATMAP_MAX_CELLS == 200

@@ -91,6 +91,15 @@ def _exclusion_note(score: RouteScore, standing: RouteStanding) -> str:
     return f"Unverified: forecast unavailable for {_fmt(score.summary.unknown_miles)}."
 
 
+def _distinct_pair(a: float, b: float) -> tuple[str, str]:
+    """Format two different averages with the fewest decimals (2 to 6) that show they differ."""
+    for digits in range(2, AVERAGE_PRECISION + 1):
+        left, right = f"{a:.{digits}f}", f"{b:.{digits}f}"
+        if left != right:
+            return left, right
+    return left, right
+
+
 def _deciding_reason(winner: RouteScore, runner_up: RouteScore) -> str:
     w, r = sort_key(winner), sort_key(runner_up)
     if w[0] != r[0]:
@@ -101,8 +110,9 @@ def _deciding_reason(winner: RouteScore, runner_up: RouteScore) -> str:
             f"{runner_up.route_id})"
         )
     if w[2] != r[2]:
+        winner_avg, runner_avg = _distinct_pair(w[2], r[2])
         return (
-            f"equal Severe and High miles; lowest average risk ({w[2]:.2f} vs {r[2]:.2f} on route "
+            f"equal Severe and High miles; lowest average risk ({winner_avg} vs {runner_avg} on route "
             f"{runner_up.route_id})"
         )
     if w[3] != r[3]:

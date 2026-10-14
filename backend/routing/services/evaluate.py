@@ -7,14 +7,13 @@ still returned with every checkpoint Unknown, so nothing is presented as safe.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from routing.domain.checkpoints import build_checkpoints, sample_positions
 from routing.domain.eta import TimingCurve, arrival_at
-from routing.domain.forecast import HourlyForecast, weather_at
+from routing.domain.forecast import HourlyForecast, forecast_hours_needed, weather_at
 from routing.domain.geometry import LatLon
 from routing.domain.ranking import RankedRoute, RouteScore, RouteStanding, recommend
 from routing.domain.scoring import summarize
@@ -22,6 +21,7 @@ from routing.domain.types import Checkpoint, Severity, SeveritySummary, WeatherS
 from routing.domain.units import gross_weight_kg
 from routing.providers.base import Forecaster, GeocodedPlace, Geocoder, ProviderRoute, TruckRouter
 from routing.providers.errors import ProviderError
+from routing.services.serialization import iso_utc, round_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +104,8 @@ def _timing(route: ProviderRoute) -> TimingCurve:
 def _fetch_forecasts(
     forecaster: Forecaster, locations: list[LatLon], latest: datetime, now: datetime
 ) -> tuple[dict[LatLon, HourlyForecast], str | None]:
-    hours = max(1, math.ceil((latest - now).total_seconds() / 3600) + 1)
     try:
-        series = forecaster.hourly_forecasts(locations, hours)
+        series = forecaster.hourly_forecasts(locations, forecast_hours_needed(latest, now))
     except ProviderError as exc:
         logger.warning("weather unavailable: %s", exc)
         return {}, exc.message
@@ -114,12 +113,17 @@ def _fetch_forecasts(
 
 
 def _corridor(routes: list[ProviderRoute]) -> list[LatLon]:
+    """Points along every route for the heatmap grid, at most CORRIDOR_MAX_POINTS in total.
+
+    A route sampled at ``step`` yields at most distance/step + 2 points (origin and destination), so a
+    step of total / (max - 2 * routes) keeps the sum within the cap without truncating any route's end.
+    """
     total = sum(r.distance_miles for r in routes)
-    step = max(CORRIDOR_MIN_STEP_MILES, total / CORRIDOR_MAX_POINTS)
+    step = max(CORRIDOR_MIN_STEP_MILES, total / (CORRIDOR_MAX_POINTS - 2 * len(routes)))
     points: list[LatLon] = []
     for route in routes:
         points.extend(p for _, p in sample_positions(route.points, route.distance_miles, step))
-    return points[:CORRIDOR_MAX_POINTS]
+    return points
 
 
 def evaluate_trip(
@@ -158,14 +162,14 @@ def evaluate_trip(
             )
         )
 
-    # Pass 1: positions and ETAs for every route, so weather is fetched in one batch.
+    # Pass 1: positions (sampled once per route) and the latest ETA, so weather is fetched in one batch.
     timings = {r.route_id: _timing(r) for r in routes}
-    locations: list[LatLon] = []
-    latest = trip.departure.astimezone(UTC)
-    for route in routes:
-        for distance, position in sample_positions(route.points, route.distance_miles, trip.spacing_miles):
-            locations.append(position)
-            latest = max(latest, arrival_at(trip.departure, timings[route.route_id], distance))
+    positions = {r.route_id: sample_positions(r.points, r.distance_miles, trip.spacing_miles) for r in routes}
+    locations = [position for route_positions in positions.values() for _, position in route_positions]
+    latest = max(
+        [trip.departure.astimezone(UTC)]
+        + [arrival_at(trip.departure, timings[r.route_id], r.distance_miles) for r in routes]
+    )
     forecasts, weather_error = _fetch_forecasts(
         providers.forecaster, list(dict.fromkeys(locations)), latest, now
     )
@@ -184,9 +188,7 @@ def evaluate_trip(
     evaluated = []
     for route in routes:
         checkpoints = build_checkpoints(
-            route.points,
-            route.distance_miles,
-            trip.spacing_miles,
+            positions[route.route_id],
             trip.departure,
             timings[route.route_id],
             lookup,
@@ -212,7 +214,7 @@ def evaluate_trip(
         "request": {
             "origin": _place_payload(origin),
             "destination": _place_payload(destination),
-            "departure_at": _iso(trip.departure),
+            "departure_at": iso_utc(trip.departure),
             "timezone": trip.timezone,
             "load_weight_lb": trip.load_lb,
             "checkpoint_spacing_miles": trip.spacing_miles,
@@ -227,7 +229,7 @@ def evaluate_trip(
         "routes": route_payloads,
         "warnings": warnings,
         "corridor": [[round(lon, 5), round(lat, 5)] for lat, lon in _corridor(routes)],
-        "heatmap_reference_at": _iso(
+        "heatmap_reference_at": iso_utc(
             trip.departure.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
         ),
         "provider": {
@@ -238,7 +240,7 @@ def evaluate_trip(
             "duplicates_removed": len(provider_routes) - len(routes),
         },
         "assumptions": list(ASSUMPTIONS),
-        "generated_at": _iso(now),
+        "generated_at": iso_utc(now),
     }
 
 
@@ -281,14 +283,6 @@ def _route_warnings(
     return warnings
 
 
-def _iso(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _round(value: float | None, digits: int) -> float | None:
-    return None if value is None else round(value, digits)
-
-
 def _place_payload(place: GeocodedPlace) -> dict[str, Any]:
     return {"label": place.label, "lat": place.lat, "lon": place.lon}
 
@@ -301,11 +295,11 @@ def _checkpoint_payload(index: int, checkpoint: Checkpoint) -> dict[str, Any]:
         "distance_miles": round(checkpoint.distance_miles, 2),
         "lat": round(checkpoint.lat, 5),
         "lon": round(checkpoint.lon, 5),
-        "eta": _iso(checkpoint.eta),
+        "eta": iso_utc(checkpoint.eta),
         "weather": {
-            "wind_mph": _round(weather.wind_mph, 1),
-            "rain_in_hr": _round(weather.rain_in_hr, 3),
-            "snow_in_hr": _round(weather.snow_in_hr, 3),
+            "wind_mph": round_or_none(weather.wind_mph, 1),
+            "rain_in_hr": round_or_none(weather.rain_in_hr, 3),
+            "snow_in_hr": round_or_none(weather.snow_in_hr, 3),
         },
         "severity": severity.label if severity is not None else "unknown",
         "severity_score": severity.value if severity is not None else None,
@@ -335,11 +329,11 @@ def _route_payload(
         "verified": summary.is_verified,
         "distance_miles": round(route.distance_miles, 2),
         "duration_seconds": round(route.duration_seconds),
-        "departure_at": _iso(departure),
-        "arrival_at": _iso(arrival_at(departure, timing, route.distance_miles)),
+        "departure_at": iso_utc(departure),
+        "arrival_at": iso_utc(arrival_at(departure, timing, route.distance_miles)),
         "eta_method": timing.method,
         "severity_miles": severity_miles,
-        "weighted_average_risk": _round(summary.weighted_average_risk, 3),
+        "weighted_average_risk": round_or_none(summary.weighted_average_risk, 3),
         "notices": route.notices,
         "geometry": {
             "type": "LineString",

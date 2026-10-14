@@ -9,6 +9,7 @@ Instants outside the covered window yield ``None`` (unavailable), never a substi
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -17,6 +18,17 @@ from datetime import UTC, datetime, timedelta
 from routing.domain.types import WeatherSample
 
 HOUR = timedelta(hours=1)
+
+
+def forecast_hours_needed(latest: datetime, now: datetime) -> int:
+    """Hourly steps a provider window starting at the current hour must hold to cover ``latest``.
+
+    Open-Meteo counts ``forecast_hours`` from the start of the current hour, so the window is sized from
+    ``now`` truncated to the hour. One extra hour covers the bucket after ``latest``: rain and snow at an
+    instant come from the next hourly total, and wind interpolates towards the next hour.
+    """
+    start = now.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+    return max(1, math.ceil((latest - start) / HOUR) + 1)
 
 
 @dataclass(frozen=True, slots=True)

@@ -27,15 +27,13 @@ def sample_positions(
 
 
 def build_checkpoints(
-    points: Sequence[LatLon],
-    total_miles: float,
-    spacing_miles: float,
+    positions: Sequence[tuple[float, LatLon]],
     departure: datetime,
     timing: TimingCurve,
     weather_lookup: WeatherLookup,
     load_lb: float,
 ) -> list[Checkpoint]:
-    positions = sample_positions(points, total_miles, spacing_miles)
+    """Checkpoints for positions from :func:`sample_positions` (computed once per route by the caller)."""
     intervals = representative_intervals([d for d, _ in positions])
     checkpoints = []
     for (distance, (lat, lon)), (start, end) in zip(positions, intervals, strict=True):

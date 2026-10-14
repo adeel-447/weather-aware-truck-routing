@@ -118,3 +118,18 @@ def test_forecast_validates_series():
             rain_in_hr=(0.0, 0.0),
             snow_in_hr=(0.0, 0.0),
         )
+
+
+# --- forecast window sizing (provider counts forecast_hours from the current hour) --------------------
+
+
+def test_forecast_hours_counted_from_start_of_current_hour():
+    from routing.domain.forecast import forecast_hours_needed
+
+    now = datetime(2026, 10, 20, 10, 50, tzinfo=UTC)
+    # 12:10 needs the 13:00 bucket: 10:00, 11:00, 12:00, 13:00.
+    assert forecast_hours_needed(datetime(2026, 10, 20, 12, 10, tzinfo=UTC), now) == 4
+    # Exactly on the hour: 10:00, 11:00, 12:00, 13:00 (next bucket for interpolation).
+    assert forecast_hours_needed(datetime(2026, 10, 20, 12, 0, tzinfo=UTC), now) == 3
+    assert forecast_hours_needed(now, now) == 2
+    assert forecast_hours_needed(now - timedelta(hours=5), now) == 1

@@ -11,12 +11,11 @@ from rest_framework import serializers
 
 from routing.domain.geometry import LatLon
 from routing.domain.sampling import ALLOWED_SPACINGS_MILES
-from routing.services.evaluate import Place
+from routing.services.evaluate import CORRIDOR_MAX_POINTS, Place
 
 MAX_LOAD_LB = 80_000
 DEPARTURE_PAST_GRACE = timedelta(hours=1)
 DEPARTURE_MAX_AHEAD = timedelta(days=14)
-CORRIDOR_MAX_POINTS = 2000
 COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 
 
@@ -115,6 +114,7 @@ class HeatmapRequestSerializer(serializers.Serializer[dict[str, Any]]):
 
     def validate_reference_at(self, value: datetime) -> datetime:
         now = _now()
+        # Reference is departure rounded down to the hour, so allow one extra hour of grace.
         if value < now - DEPARTURE_PAST_GRACE - timedelta(hours=1) or value > now + DEPARTURE_MAX_AHEAD:
-            raise serializers.ValidationError("reference time must be between now and 14 days ahead")
+            raise serializers.ValidationError("reference time must be between 2 hours ago and 14 days ahead")
         return value

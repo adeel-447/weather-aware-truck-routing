@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from routing.domain.geometry import LatLon
 
-MAX_CELLS = 300
+MAX_CELLS = 200  # default for HEATMAP_MAX_CELLS; each cell is one forecast location
 INITIAL_CELL_DEGREES = 0.1
 MIN_CELLS = 9  # one cell plus its ring: any corridor fits once cells are large enough
 

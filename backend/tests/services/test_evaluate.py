@@ -208,3 +208,42 @@ def test_heatmap_reference_is_departure_hour_and_corridor_is_bounded():
     result = run(request=trip(departure=DEPARTURE + timedelta(minutes=40)))
     assert result["heatmap_reference_at"] == "2026-10-20T13:00:00Z"
     assert 0 < len(result["corridor"]) <= 2000
+
+
+class ProviderWindowForecaster(FakeForecaster):
+    """Like Open-Meteo: returns exactly `forecast_hours` hours starting at the current hour."""
+
+    def __init__(self, now):
+        super().__init__()
+        self.now = now
+
+    def hourly_forecasts(self, locations, forecast_hours):
+        self.start = self.now.replace(minute=0, second=0, microsecond=0)
+        self.hours = forecast_hours
+        return super().hourly_forecasts(locations, forecast_hours)
+
+
+def test_forecast_window_covers_latest_eta_when_now_is_mid_hour():
+    # now 12:40, route A arrives 14:30: the window must include 15:00 for the destination checkpoint.
+    now = datetime(2026, 10, 20, 12, 40, tzinfo=UTC)
+    providers = Providers(
+        FakeGeocoder(), FakeRouter(routes=three_routes()[:1]), ProviderWindowForecaster(now)
+    )
+    result = evaluate_trip(trip(), providers, SETTINGS, now=now)
+    route = result["routes"][0]
+    assert route["checkpoints"][-1]["eta"] == "2026-10-20T14:30:00Z"
+    assert route["checkpoints"][-1]["severity"] != "unknown"
+    assert route["verified"] is True
+
+
+def test_corridor_is_capped_without_dropping_any_route_destination():
+    # Three very long routes: naive sampling would exceed the cap and truncate the last route.
+    routes = [
+        straight_route(rid, via, 6000.0, 6000 * 60)
+        for rid, via in (("A", (42.05, -88.3)), ("B", (41.5, -88.1)), ("C", (42.4, -88.0)))
+    ]
+    result = run(router=FakeRouter(routes=routes), request=trip(spacing=50))
+    corridor = result["corridor"]
+    assert len(corridor) <= 2000
+    destination = [round(ROCKFORD[1], 5), round(ROCKFORD[0], 5)]
+    assert corridor.count(destination) == 3  # every route still ends at the destination

@@ -7,16 +7,16 @@ slider without further requests.
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from routing.domain.forecast import weather_at
+from routing.domain.forecast import forecast_hours_needed, weather_at
 from routing.domain.geometry import LatLon
 from routing.domain.heatmap_grid import MAX_CELLS, corridor_grid
 from routing.domain.risk import assess
 from routing.providers.base import Forecaster
+from routing.services.serialization import iso_utc, round_or_none
 
 MAX_OFFSET_HOURS = 48
 UNITS = {"wind_mph": "mph", "rain_in_hr": "in/hr", "snow_in_hr": "in/hr"}
@@ -25,14 +25,6 @@ NOTE = (
     "cargo load as route scoring. This is not the weather at each checkpoint's ETA and does not affect "
     "the route recommendation."
 )
-
-
-def _round(value: float | None, digits: int) -> float | None:
-    return None if value is None else round(value, digits)
-
-
-def _iso(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def corridor_heatmap(
@@ -47,8 +39,7 @@ def corridor_heatmap(
     reference = reference_at.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
     grid = corridor_grid(corridor, max_cells=max_cells)
     last_valid = reference + timedelta(hours=MAX_OFFSET_HOURS)
-    hours = max(1, math.ceil((last_valid - now).total_seconds() / 3600) + 1)
-    series = forecaster.hourly_forecasts(list(grid.centers), hours)
+    series = forecaster.hourly_forecasts(list(grid.centers), forecast_hours_needed(last_valid, now))
 
     frames = []
     for offset in range(MAX_OFFSET_HOURS + 1):
@@ -58,12 +49,12 @@ def corridor_heatmap(
         frames.append(
             {
                 "offset_hours": offset,
-                "valid_at": _iso(valid_at),
+                "valid_at": iso_utc(valid_at),
                 "available": any(s is not None for s in severities),
                 "severity": [s.value if s is not None else None for s in severities],
-                "wind_mph": [_round(s.wind_mph, 1) for s in samples],
-                "rain_in_hr": [_round(s.rain_in_hr, 3) for s in samples],
-                "snow_in_hr": [_round(s.snow_in_hr, 3) for s in samples],
+                "wind_mph": [round_or_none(s.wind_mph, 1) for s in samples],
+                "rain_in_hr": [round_or_none(s.rain_in_hr, 3) for s in samples],
+                "snow_in_hr": [round_or_none(s.snow_in_hr, 3) for s in samples],
             }
         )
 
@@ -72,10 +63,10 @@ def corridor_heatmap(
         "severity_scale": {"0": "low", "1": "moderate", "2": "high", "3": "severe", "4": "no_travel"},
         "units": UNITS,
         "note": NOTE,
-        "reference_at": _iso(reference),
+        "reference_at": iso_utc(reference),
         "load_weight_lb": load_lb,
         "cell_size_degrees": grid.cell_degrees,
         "cells": [[lon, lat] for lat, lon in grid.centers],
         "frames": frames,
-        "generated_at": _iso(now),
+        "generated_at": iso_utc(now),
     }
