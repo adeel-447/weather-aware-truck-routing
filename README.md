@@ -2,11 +2,11 @@
 
 React + Django app that compares up to three truck routes, scores each using forecast weather at the truck's estimated arrival time at every checkpoint, and recommends the safest route.
 
-> Status: backend (domain logic, provider adapters, API) complete and tested. Frontend in progress.
+> Status: backend (domain logic, provider adapters, API) complete and tested. Frontend scaffolded (map shell, typed API client); UI in progress.
 
 ## Structure
 - `backend/` — Django + DRF API. Pure business logic lives in `backend/routing/domain/`.
-- `frontend/` — React + TypeScript + Vite + MapLibre (not yet scaffolded).
+- `frontend/` — React 19 + TypeScript (strict) + Vite 8 + MapLibre GL 6 + TanStack Query 5. `src/api` typed client and query hooks, `src/types` API contract, `src/map` single map instance, `src/components` UI.
 - `CLAUDE.md`, `.claude/skills/weather-routing/` — Claude Code instructions.
 
 ## Setup (backend)
@@ -16,6 +16,22 @@ cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python manage.py runserver
+```
+
+## Setup (frontend)
+```bash
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173, proxies /api to Django on :8000
+```
+Run the backend alongside it. `VITE_API_BASE_URL` stays empty in development; set it to the backend origin for production builds.
+
+## Tests and checks (frontend)
+```bash
+cd frontend
+npm test                        # Vitest + Testing Library (jsdom; MapLibre is mocked)
+npm run typecheck && npm run lint && npm run format:check
+npm run build
 ```
 
 ## Tests and checks (backend)

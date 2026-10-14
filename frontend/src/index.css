@@ -1,0 +1,107 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1f2430;
+  --text-muted: #5b6474;
+  --border: #dde1e7;
+  --accent: #1f6feb;
+
+  /* Severity scale, shared by route lines, checkpoints, legend and heatmap. */
+  --sev-low: #2e9e5b;
+  --sev-moderate: #e3b505;
+  --sev-high: #f07c1a;
+  --sev-severe: #d62828;
+  --sev-no-travel: #6a0dad;
+  --sev-unknown: #8a8f98;
+
+  --panel-width: 400px;
+  --radius: 8px;
+
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.25rem;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: var(--panel-width) 1fr;
+  height: 100%;
+}
+
+.app__panel {
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.app__subtitle {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.app__map {
+  position: relative;
+  min-height: 0;
+}
+
+.map-view,
+.map-view__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-view__status {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+@media (max-width: 800px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 55vh auto;
+  }
+
+  .app__map {
+    grid-row: 1;
+  }
+
+  .app__panel {
+    grid-row: 2;
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+}
