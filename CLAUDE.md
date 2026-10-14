@@ -61,6 +61,14 @@ Business logic belongs in `backend/routing/domain/`. Views and providers stay th
 - Tests never hit the network: use fakes and recorded fixtures.
 - Avoid unnecessary abstractions, dependencies, background jobs and extra features.
 
+## Type safety
+Strict typing is mandatory for all code, new and changed; never loosen a setting to get a check green.
+- **TypeScript** (`frontend/tsconfig.*.json`): `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitReturns`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noUncheckedSideEffectImports`. ESLint runs `strictTypeChecked`.
+- No `any`, no non-null `!` and no type assertions (`as T`) in app code; `as const` is fine. Narrow `unknown` with type guards instead. ESLint enforces this; tests may assert fixture shapes.
+- Data from outside the app (API responses, map feature properties, JSON) is `unknown` until a guard checks it: `src/api/guards.ts` for responses, `src/map/featureProps.ts` for map features.
+- Optional props accept `undefined` explicitly (`prop?: T | undefined`) when callers may pass it; switches over unions are exhaustive.
+- **Python**: `mypy --strict` (Django and DRF plugins), typed dataclasses at service boundaries, no untyped defs outside tests, no `# type: ignore` without a reason in the same line.
+
 ## Development workflow & quality gates
 Work through the approved plan one step at a time:
 1. Docs/config → 2. Backend scaffold → 3. Domain logic + tests → 4. Provider adapters → 5. API endpoints → 6. Frontend scaffold → 7. Map UI → 8. Heatmap → 9. Error states/polish → 10. README, deployment, demo.

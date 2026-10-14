@@ -73,8 +73,10 @@ A skipped, xfailed or loosened test or lint rule without a stated reason is a fi
 - New logic has unit tests; bug fixes have a regression test that fails before the fix.
 
 ### Style and hygiene
-- Python: typed (mypy clean), dataclasses at service boundaries, ruff-formatted, no bare `except`.
-- TypeScript: strict types, no `any` without reason, ESLint/Prettier clean.
+- Type safety per `CLAUDE.md` "Type safety": no `any`, non-null `!` or `as` assertions in app code,
+  external data narrowed by guards, no loosened compiler/mypy settings, no unexplained `type: ignore`.
+- Python: mypy strict clean, dataclasses at service boundaries, ruff-formatted, no bare `except`.
+- TypeScript: ESLint/Prettier clean.
 - No new dependencies, abstractions, background jobs or features beyond the task.
 - No secrets, `.env`, caches, virtualenvs or build output in the diff.
 - Commits follow the `CLAUDE.md` format (`<type>: <summary>`, imperative, ≤ 72 chars).
