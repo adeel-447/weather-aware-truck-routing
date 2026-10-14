@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from routing.domain.forecast import HourlyForecast
 from routing.providers.base import GeocodedPlace, ProviderRoute
+from routing.providers.errors import PlaceNotFound
 
 SERIES_START = datetime(2026, 10, 19, 0, 0, tzinfo=UTC)
 SERIES_HOURS = 400
@@ -36,6 +37,8 @@ class FakeGeocoder:
         self.queries.append(query)
         if self.error:
             raise self.error
+        if query not in self.places:
+            raise PlaceNotFound("HERE", f"no location found for '{query}'")
         return self.places[query]
 
 

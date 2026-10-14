@@ -20,7 +20,7 @@ from routing.domain.scoring import summarize
 from routing.domain.types import Checkpoint, Severity, SeveritySummary, WeatherSample
 from routing.domain.units import gross_weight_kg
 from routing.providers.base import Forecaster, GeocodedPlace, Geocoder, ProviderRoute, TruckRouter
-from routing.providers.errors import ProviderError
+from routing.providers.errors import PlaceNotFound, ProviderError
 from routing.services.serialization import iso_utc, round_or_none
 
 logger = logging.getLogger(__name__)
@@ -70,15 +70,21 @@ class Settings:
 
 
 class TripValidationError(ValueError):
-    pass
+    def __init__(self, message: str, fields: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.fields = fields  # request fields the error applies to, for inline display
 
 
-def _resolve(place: Place, geocoder: Geocoder) -> GeocodedPlace:
+def _resolve(place: Place, geocoder: Geocoder, field: str) -> GeocodedPlace:
     if place.coordinates is not None:
         lat, lon = place.coordinates
         return GeocodedPlace(label=f"{lat:.5f}, {lon:.5f}", lat=lat, lon=lon)
     assert place.query is not None
-    return geocoder.geocode(place.query)
+    try:
+        return geocoder.geocode(place.query)
+    except PlaceNotFound as exc:
+        exc.field = field
+        raise
 
 
 def _dedupe(routes: list[ProviderRoute]) -> list[ProviderRoute]:
@@ -130,10 +136,13 @@ def evaluate_trip(
     trip: TripRequest, providers: Providers, settings: Settings, now: datetime | None = None
 ) -> dict[str, Any]:
     now = now or datetime.now(UTC)
-    origin = _resolve(trip.origin, providers.geocoder)
-    destination = _resolve(trip.destination, providers.geocoder)
+    origin = _resolve(trip.origin, providers.geocoder, "origin")
+    destination = _resolve(trip.destination, providers.geocoder, "destination")
     if (round(origin.lat, 4), round(origin.lon, 4)) == (round(destination.lat, 4), round(destination.lon, 4)):
-        raise TripValidationError("origin and destination resolve to the same place")
+        # Either input may be the wrong one, so the error is shown under both.
+        raise TripValidationError(
+            "origin and destination resolve to the same place", fields=("origin", "destination")
+        )
 
     routing_weight_lb = settings.empty_truck_lb + trip.load_lb
     provider_routes = providers.router.truck_routes(

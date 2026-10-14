@@ -53,3 +53,7 @@ class NoRouteFound(ProviderError):
 class PlaceNotFound(ProviderError):
     http_status = 422
     code = "place_not_found"
+
+    def __init__(self, provider: str, message: str, field: str | None = None) -> None:
+        super().__init__(provider, message)
+        self.field = field  # request field the place came from, so the UI can show the error inline

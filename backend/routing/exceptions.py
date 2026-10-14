@@ -9,7 +9,7 @@ from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
-from routing.providers.errors import ProviderError
+from routing.providers.errors import PlaceNotFound, ProviderError
 from routing.services.evaluate import TripValidationError
 
 logger = logging.getLogger(__name__)
@@ -25,10 +25,14 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response |
             status.HTTP_400_BAD_REQUEST, "invalid_request", "Request validation failed.", fields=exc.detail
         )
     if isinstance(exc, TripValidationError):
-        return error_response(status.HTTP_400_BAD_REQUEST, "invalid_request", str(exc))
+        extra = {"fields": {field: [str(exc)] for field in exc.fields}} if exc.fields else {}
+        return error_response(status.HTTP_400_BAD_REQUEST, "invalid_request", str(exc), **extra)
     if isinstance(exc, ProviderError):
         logger.warning("provider failure: %s", exc)
-        return error_response(exc.http_status, exc.code, exc.message, provider=exc.provider)
+        extra = {}
+        if isinstance(exc, PlaceNotFound) and exc.field:
+            extra["fields"] = {exc.field: [exc.message]}
+        return error_response(exc.http_status, exc.code, exc.message, provider=exc.provider, **extra)
     response = exception_handler(exc, context)
     if response is not None:
         detail = (

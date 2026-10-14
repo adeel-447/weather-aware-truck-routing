@@ -9,7 +9,6 @@ from routing import serializers as request_serializers
 from routing.providers import factory
 from routing.providers.errors import (
     NoRouteFound,
-    PlaceNotFound,
     ProviderConfigError,
     ProviderRateLimited,
     ProviderTimeout,
@@ -175,6 +174,7 @@ def test_same_place_after_geocoding_is_rejected(providers):
     error = error_of(post(EVALUATE, {**VALID, "destination": "Downtown Chicago"}))
     assert error["code"] == "invalid_request"
     assert "same place" in error["message"]
+    assert set(error["fields"]) == {"origin", "destination"}  # either input may be wrong
 
 
 # --- evaluate: provider failures ---------------------------------------------------------------------
@@ -198,11 +198,15 @@ def test_routing_failures_map_to_clear_errors(providers, exc, status, code):
     assert error["message"] == exc.message
 
 
-def test_geocoding_miss_is_422(providers):
-    providers["geocoder"].error = PlaceNotFound("HERE", "no location found for 'Atlantis'")
-    response = post(EVALUATE, {**VALID, "origin": "Atlantis"})
+@pytest.mark.parametrize("field", ["origin", "destination"])
+def test_geocoding_miss_is_422_and_names_the_field(providers, field, caplog):
+    response = post(EVALUATE, {**VALID, field: "Atlantis"})
     assert response.status_code == 422
-    assert error_of(response)["code"] == "place_not_found"
+    error = error_of(response)
+    assert error["code"] == "place_not_found"
+    assert error["provider"] == "HERE"
+    assert error["fields"] == {field: ["no location found for 'Atlantis'"]}
+    assert "provider failure" in caplog.text  # misses stay visible in the logs
 
 
 def test_weather_outage_still_returns_routes_marked_unknown(providers):
