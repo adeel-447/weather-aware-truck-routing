@@ -25,51 +25,85 @@ MAX_RETRY_AFTER_S = 5.0
 
 
 class JsonClient:
+    """JSON GET with timeouts and conservative retries.
+
+    Retried: timeouts, connection failures, 5xx, and 429 with a short Retry-After. Not retried: other
+    4xx, TLS failures and malformed URLs (configuration errors). Each call also has a total time budget
+    so a slow provider cannot hold a request for (retries + 1) x timeouts.
+    """
+
     def __init__(
         self,
         provider: str,
         connect_timeout_s: float,
         read_timeout_s: float,
         max_retries: int,
+        budget_s: float = 20.0,
         session: requests.Session | None = None,
         sleep: Any = time.sleep,
+        clock: Any = time.monotonic,
     ) -> None:
         self.provider = provider
         self.timeout = (connect_timeout_s, read_timeout_s)
         self.max_retries = max_retries
+        self.budget_s = budget_s
         self.session = session or requests.Session()
         self._sleep = sleep
+        self._clock = clock
 
     def get(self, url: str, params: dict[str, str | int]) -> Any:
+        started = float(self._clock())
         attempt = 0
         while True:
+            failure: ProviderError
+            cause: requests.RequestException
             try:
                 response = self.session.get(url, params=params, timeout=self.timeout)
             except requests.Timeout as exc:
-                if attempt < self.max_retries:
-                    attempt = self._backoff(attempt, None)
-                    continue
-                raise ProviderTimeout(self.provider, "request timed out") from exc
+                failure, cause = ProviderTimeout(self.provider, "request timed out"), exc
+            except (
+                requests.exceptions.MissingSchema,
+                requests.exceptions.InvalidSchema,
+                requests.exceptions.InvalidURL,
+            ) as exc:
+                raise ProviderConfigError(self.provider, "invalid provider URL") from exc
+            except requests.exceptions.SSLError as exc:  # a ConnectionError subclass, but not transient
+                raise ProviderUnavailable(self.provider, "secure connection failed") from exc
+            except requests.ConnectionError as exc:
+                failure, cause = ProviderUnavailable(self.provider, "connection failed"), exc
             except requests.RequestException as exc:
-                if attempt < self.max_retries:
-                    attempt = self._backoff(attempt, None)
+                raise ProviderUnavailable(self.provider, "request failed") from exc
+            else:
+                retry_after = response.headers.get("Retry-After")
+                # 429 is retried only when the provider says when; blind retries just burn more quota.
+                retryable = response.status_code in RETRYABLE_STATUS and (
+                    response.status_code != 429 or _short_retry_after(retry_after)
+                )
+                if retryable and self._may_retry(attempt, started, retry_after):
+                    attempt = self._backoff(attempt, retry_after)
                     continue
-                raise ProviderUnavailable(self.provider, "connection failed") from exc
+                return self._parse(response)
 
-            retry_after = response.headers.get("Retry-After")
-            # 429 is retried only when the provider says when; blind retries just burn more quota.
-            retryable = response.status_code in RETRYABLE_STATUS and (
-                response.status_code != 429 or _short_retry_after(retry_after)
-            )
-            if retryable and attempt < self.max_retries:
-                attempt = self._backoff(attempt, retry_after)
+            if self._may_retry(attempt, started, None):
+                attempt = self._backoff(attempt, None)
                 continue
-            return self._parse(response)
+            raise failure from cause
+
+    def _delay(self, attempt: int, retry_after: str | None) -> float:
+        if retry_after and retry_after.isdigit():
+            return min(float(retry_after), MAX_RETRY_AFTER_S)
+        return float(BACKOFF_BASE_S * 2**attempt)
+
+    def _may_retry(self, attempt: int, started: float, retry_after: str | None) -> bool:
+        """Retry only if another full attempt (backoff + timeouts) still fits in the call budget."""
+        if attempt >= self.max_retries:
+            return False
+        worst_next = self._delay(attempt, retry_after) + sum(self.timeout)
+        elapsed = float(self._clock()) - started
+        return elapsed + worst_next <= self.budget_s
 
     def _backoff(self, attempt: int, retry_after: str | None) -> int:
-        delay = BACKOFF_BASE_S * 2**attempt
-        if retry_after and retry_after.isdigit():
-            delay = min(float(retry_after), MAX_RETRY_AFTER_S)
+        delay = self._delay(attempt, retry_after)
         logger.warning("%s: retrying after %.1fs (attempt %d)", self.provider, delay, attempt + 1)
         self._sleep(delay)
         return attempt + 1

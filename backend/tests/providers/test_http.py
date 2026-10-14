@@ -83,3 +83,41 @@ def test_error_message_never_includes_query_secrets(client_factory):
     with pytest.raises(ProviderUnavailable) as excinfo:
         client_factory(max_retries=0).get(URL, {"apiKey": "SECRET"})
     assert "SECRET" not in str(excinfo.value)
+
+
+@responses.activate
+def test_malformed_url_is_a_config_error_without_retry(client_factory, sleeps):
+    with pytest.raises(ProviderConfigError, match="invalid provider URL"):
+        client_factory().get("not-a-url", {})
+    assert sleeps == []
+
+
+@responses.activate
+def test_tls_failure_is_not_retried(client_factory, sleeps):
+    responses.get(URL, body=requests.exceptions.SSLError("certificate verify failed"))
+    with pytest.raises(ProviderUnavailable, match="secure connection failed"):
+        client_factory().get(URL, {})
+    assert len(responses.calls) == 1
+    assert sleeps == []
+
+
+@responses.activate
+def test_connection_errors_are_retried(client_factory, sleeps):
+    responses.get(URL, body=requests.ConnectionError("reset"))
+    responses.get(URL, json={"ok": True})
+    assert client_factory().get(URL, {}) == {"ok": True}
+    assert sleeps == [0.5]
+
+
+@responses.activate
+def test_call_budget_stops_retries(sleeps):
+    from routing.providers.http import JsonClient
+
+    clock = iter([0.0, 9.0])  # start, then 9 s elapsed after the first failed attempt
+    client = JsonClient(
+        "Test", 3.0, 10.0, max_retries=2, budget_s=20.0, sleep=sleeps.append, clock=lambda: next(clock)
+    )
+    responses.get(URL, body=requests.Timeout())
+    with pytest.raises(ProviderTimeout):
+        client.get(URL, {})
+    assert len(responses.calls) == 1  # 9 s + 0.5 s backoff + 13 s timeouts would exceed 20 s

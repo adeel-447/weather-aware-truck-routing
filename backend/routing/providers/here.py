@@ -121,12 +121,7 @@ def _parse_route(route: dict[str, Any], index: int) -> ProviderRoute:
         if section_segments is None:
             spans_usable = False
         else:
-            # Pre/post actions (e.g. ferry boarding) are in the summary but not in spans: model the
-            # difference as a stop at the section start so total elapsed time matches the summary.
-            waiting = duration_s - sum(seconds for _, seconds in section_segments)
-            if waiting > 0:
-                segments.append((0.0, waiting))
-            segments.extend(section_segments)
+            segments.extend(_reconcile(section_segments, duration_s))
 
         # Consecutive sections share their joint point.
         points.extend(section_points[1:] if points and section_points[0] == points[-1] else section_points)
@@ -144,12 +139,34 @@ def _parse_route(route: dict[str, Any], index: int) -> ProviderRoute:
 
 
 def _span_segments(spans: Any, point_count: int) -> list[tuple[float, float]] | None:
-    """(miles, seconds) per span, or None if spans are missing or lack duration/length."""
-    if not spans:
+    """(miles, seconds) per span, or None if spans are missing or malformed (proportional fallback)."""
+    if not isinstance(spans, list) or not spans:
         return None
     segments = []
     for span in spans:
-        if "length" not in span or "duration" not in span or not 0 <= int(span["offset"]) < point_count:
+        try:
+            offset = int(span["offset"])
+            length_m = float(span["length"])
+            duration_s = float(span["duration"])
+        except (KeyError, TypeError, ValueError):
             return None
-        segments.append((meters_to_miles(float(span["length"])), float(span["duration"])))
+        if not 0 <= offset < point_count or length_m < 0 or duration_s < 0:
+            return None
+        segments.append((meters_to_miles(length_m), duration_s))
+    return segments
+
+
+def _reconcile(segments: list[tuple[float, float]], section_s: float) -> list[tuple[float, float]]:
+    """Make a section's span time add up to its summary duration (the route's reported drive time).
+
+    Pre/post actions (e.g. ferry boarding) are in the summary but not in spans: the shortfall becomes a
+    stop at the section start. If spans add up to more than the summary, they are scaled down so ETAs,
+    arrival time and duration stay consistent.
+    """
+    span_s = sum(seconds for _, seconds in segments)
+    if span_s < section_s:
+        return [(0.0, section_s - span_s), *segments]
+    if span_s > section_s > 0:
+        scale = section_s / span_s
+        return [(miles, seconds * scale) for miles, seconds in segments]
     return segments

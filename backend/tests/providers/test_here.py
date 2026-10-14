@@ -131,3 +131,23 @@ def test_geocode_no_match(client_factory):
     responses.get(GEOCODE_URL, json={"items": []})
     with pytest.raises(PlaceNotFound):
         HereGeocoder(client_factory("HERE"), "https://geocode.test/v1", "k", "").geocode("nowhere")
+
+
+@responses.activate
+def test_span_without_offset_falls_back_to_proportional_eta(client_factory):
+    body = load_fixture("here_routes_synthetic.json")
+    del body["routes"][0]["sections"][0]["spans"][1]["offset"]
+    responses.get(ROUTES_URL, json=body)
+    route_a, _ = call_routes(client_factory)
+    assert route_a.timing_segments is None  # disclosed proportional fallback, not a 502
+
+
+@responses.activate
+def test_span_time_longer_than_summary_is_scaled_to_summary(client_factory):
+    body = load_fixture("here_routes_synthetic.json")
+    for span in body["routes"][0]["sections"][0]["spans"]:
+        span["duration"] = 1500  # 4,500 s of spans vs a 3,600 s summary
+    responses.get(ROUTES_URL, json=body)
+    route_a, _ = call_routes(client_factory)
+    assert route_a.timing_segments is not None
+    assert sum(seconds for _, seconds in route_a.timing_segments) == pytest.approx(route_a.duration_seconds)

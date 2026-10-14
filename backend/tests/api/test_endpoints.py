@@ -292,3 +292,12 @@ def test_heatmap_grid_respects_configured_cap(providers, settings):
 def test_heatmap_does_not_touch_routing(providers):
     post(HEATMAP, HEATMAP_BODY)
     assert providers["router"].calls == []
+
+
+def test_heatmap_reference_error_message_matches_rule(providers):
+    error = error_of(post(HEATMAP, {**HEATMAP_BODY, "reference_at": "2026-10-19T00:00:00Z"}))
+    assert "between 2 hours ago and 14 days ahead" in str(error["fields"]["reference_at"])
+
+
+def test_forecast_cache_is_sized_for_large_trips(settings):
+    assert settings.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"] >= 5000

@@ -19,6 +19,7 @@ def _client(provider: str) -> JsonClient:
         connect_timeout_s=settings.PROVIDER_CONNECT_TIMEOUT_S,
         read_timeout_s=settings.PROVIDER_READ_TIMEOUT_S,
         max_retries=settings.PROVIDER_MAX_RETRIES,
+        budget_s=settings.PROVIDER_CALL_BUDGET_S,
     )
 
 

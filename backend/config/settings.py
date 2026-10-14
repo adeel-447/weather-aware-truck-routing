@@ -54,6 +54,8 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "weather-routing",
         "TIMEOUT": int(os.environ.get("CACHE_TIMEOUT_S", "900")),
+        # One entry per forecast grid cell: a long 3-route trip plus its heatmap is ~1,000 entries.
+        "OPTIONS": {"MAX_ENTRIES": int(os.environ.get("CACHE_MAX_ENTRIES", "10000"))},
     }
 }
 
@@ -96,6 +98,8 @@ OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")
 PROVIDER_CONNECT_TIMEOUT_S = float(os.environ.get("PROVIDER_CONNECT_TIMEOUT_S", "3"))
 PROVIDER_READ_TIMEOUT_S = float(os.environ.get("PROVIDER_READ_TIMEOUT_S", "10"))
 PROVIDER_MAX_RETRIES = int(os.environ.get("PROVIDER_MAX_RETRIES", "2"))
+# Upper bound on one provider call including retries (a request may make several calls).
+PROVIDER_CALL_BUDGET_S = float(os.environ.get("PROVIDER_CALL_BUDGET_S", "20"))
 
 LOGGING = {
     "version": 1,
