@@ -8,6 +8,7 @@ import { useEffect, useEffectEvent } from 'react'
 
 import { routeColor } from '../theme'
 import { CHECKPOINT_LAYER } from './CheckpointLayer'
+import { stringProp } from './featureProps'
 import type { RouteResult } from '../types/api'
 import { useMap } from './MapContext'
 
@@ -100,12 +101,12 @@ export function RouteLayers({
         map.getLayer(CHECKPOINT_LAYER) !== undefined &&
         map.queryRenderedFeatures(event.point, { layers: [CHECKPOINT_LAYER] }).length > 0
       if (onCheckpoint) return
-      const id = event.features?.[0]?.properties.id as string | undefined
+      const id = stringProp(event.features?.[0], 'id')
       if (id) select(id)
     }
     const move = (event: MapLayerMouseEvent) => {
       map.getCanvas().style.cursor = 'pointer'
-      const id = event.features?.[0]?.properties.id as string | undefined
+      const id = stringProp(event.features?.[0], 'id')
       hover(id ?? null)
     }
     const leave = () => {

@@ -11,7 +11,7 @@ import { MapContext } from './MapContext'
 // bundled the library (dev pre-bundling and production). Point it at the asset Vite serves/emits.
 setWorkerUrl(workerUrl)
 
-const INITIAL_VIEW = { center: [-96, 39] as [number, number], zoom: 3.5 } // contiguous US
+const INITIAL_VIEW: { center: [number, number]; zoom: number } = { center: [-96, 39], zoom: 3.5 } // contiguous US
 
 interface MapViewProps {
   /** Layer components; rendered once the style has loaded and given the map via context. */

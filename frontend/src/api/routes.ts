@@ -5,11 +5,12 @@ import type {
   HeatmapResponse,
 } from '../types/api'
 import { postJson } from './client'
+import { isEvaluateResponse, isHeatmapResponse } from './guards'
 
 export function evaluateRoutes(request: EvaluateRequest, signal?: AbortSignal) {
-  return postJson<EvaluateResponse>('/api/routes/evaluate/', request, signal)
+  return postJson<EvaluateResponse>('/api/routes/evaluate/', request, isEvaluateResponse, signal)
 }
 
 export function fetchHeatmap(request: HeatmapRequest, signal?: AbortSignal) {
-  return postJson<HeatmapResponse>('/api/heatmap/', request, signal)
+  return postJson<HeatmapResponse>('/api/heatmap/', request, isHeatmapResponse, signal)
 }

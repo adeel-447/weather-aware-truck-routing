@@ -1,9 +1,15 @@
-import { type GeoJSONSource, type MapLayerMouseEvent, Popup } from 'maplibre-gl'
+import {
+  type ExpressionSpecification,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+  Popup,
+} from 'maplibre-gl'
 import { useEffect, useEffectEvent, useRef } from 'react'
 
 import { formatDateTime, formatMiles, formatValue } from '../format'
 import { SEVERITY_COLORS, SEVERITY_LABELS } from '../theme'
-import type { Checkpoint, RouteResult, SeverityOrUnknown } from '../types/api'
+import type { Checkpoint, RouteResult } from '../types/api'
+import { numberProp } from './featureProps'
 import { useMap } from './MapContext'
 
 const SOURCE = 'checkpoints'
@@ -17,10 +23,19 @@ interface Props {
   focus: { index: number } | null
 }
 
-const colorBySeverity = [
+const colorBySeverity: ExpressionSpecification = [
   'match',
   ['get', 'severity'],
-  ...(Object.entries(SEVERITY_COLORS) as [SeverityOrUnknown, string][]).flat(),
+  'low',
+  SEVERITY_COLORS.low,
+  'moderate',
+  SEVERITY_COLORS.moderate,
+  'high',
+  SEVERITY_COLORS.high,
+  'severe',
+  SEVERITY_COLORS.severe,
+  'no_travel',
+  SEVERITY_COLORS.no_travel,
   SEVERITY_COLORS.unknown,
 ]
 
@@ -84,7 +99,7 @@ export function CheckpointLayer({ route, timeZone, focus }: Props) {
       source: SOURCE,
       paint: {
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 4, 10, 7],
-        'circle-color': colorBySeverity as never,
+        'circle-color': colorBySeverity,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
@@ -92,7 +107,7 @@ export function CheckpointLayer({ route, timeZone, focus }: Props) {
     popup.current = new Popup({ closeButton: true, maxWidth: '260px', offset: 10 })
 
     const open = (event: MapLayerMouseEvent) => {
-      openPopup(event.features?.[0]?.properties.index as number | undefined)
+      openPopup(numberProp(event.features?.[0], 'index'))
     }
     const enter = () => {
       map.getCanvas().style.cursor = 'pointer'

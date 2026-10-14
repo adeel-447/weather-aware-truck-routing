@@ -20,10 +20,17 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      // Strict typing (CLAUDE.md): narrow with type guards instead of asserting. `as const` is allowed.
+      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
   {
+    // Tests may assert fixture shapes and non-null lookups.
     files: ['**/*.test.{ts,tsx}', 'src/test/**'],
-    rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'as' }],
+    },
   },
 )

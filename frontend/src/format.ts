@@ -58,7 +58,9 @@ function zoneOffsetMs(instant: number, timeZone: string): number {
 export function zonedLocalToInstant(local: string, timeZone: string): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local)
   if (!match) return null
-  const [, y, mo, d, h, mi] = match.map(Number) as [number, number, number, number, number, number]
+  const [y, mo, d, h, mi] = match.slice(1).map(Number)
+  if (y === undefined || mo === undefined || d === undefined || h === undefined || mi === undefined)
+    return null
   const guess = Date.UTC(y, mo - 1, d, h, mi)
   const first = guess - zoneOffsetMs(guess, timeZone)
   return guess - zoneOffsetMs(first, timeZone)

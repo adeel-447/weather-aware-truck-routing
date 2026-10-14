@@ -11,6 +11,14 @@ import {
 } from './tripValidation'
 
 const SPACINGS: CheckpointSpacing[] = [10, 25, 50]
+const FIELDS: (keyof TripFormValues)[] = [
+  'origin',
+  'destination',
+  'departureLocal',
+  'timezone',
+  'loadWeightLb',
+  'spacing',
+]
 const COMMON_ZONES = [
   'America/New_York',
   'America/Chicago',
@@ -25,8 +33,8 @@ const COMMON_ZONES = [
 interface TripFormProps {
   onSubmit: (request: EvaluateRequest) => void
   isSubmitting: boolean
-  serverErrors?: TripFormErrors
-  initial?: TripFormValues
+  serverErrors?: TripFormErrors | undefined
+  initial?: TripFormValues | undefined
 }
 
 export function TripForm({ onSubmit, isSubmitting, serverErrors, initial }: TripFormProps) {
@@ -47,11 +55,11 @@ export function TripForm({ onSubmit, isSubmitting, serverErrors, initial }: Trip
   const zones = COMMON_ZONES.includes(values.timezone)
     ? COMMON_ZONES
     : [values.timezone, ...COMMON_ZONES]
-  const activeServerErrors = Object.fromEntries(
-    Object.entries(serverErrors ?? {}).filter(
-      ([key]) => !editedSinceServer.has(key as keyof TripFormValues),
-    ),
-  ) as TripFormErrors
+  const activeServerErrors: TripFormErrors = {}
+  for (const key of FIELDS) {
+    const message = serverErrors?.[key]
+    if (message !== undefined && !editedSinceServer.has(key)) activeServerErrors[key] = message
+  }
   const shown: TripFormErrors = { ...activeServerErrors, ...errors }
 
   function update<K extends keyof TripFormValues>(key: K, value: TripFormValues[K]) {

@@ -24,14 +24,23 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
   return typeof error === 'object' && error !== null && 'code' in error && 'message' in error
 }
 
-export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+/**
+ * POST JSON and return the response once `isExpected` has verified its shape. Network data is
+ * `unknown` until a guard narrows it; there is no unchecked cast.
+ */
+export async function postJson<T>(
+  path: string,
+  body: unknown,
+  isExpected: (payload: unknown) => payload is T,
+  signal?: AbortSignal,
+): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${config.apiBaseUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
-      signal,
+      signal: signal ?? null,
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
@@ -49,11 +58,11 @@ export async function postJson<T>(path: string, body: unknown, signal?: AbortSig
       message: `Request failed (HTTP ${response.status}).`,
     })
   }
-  if (payload === null) {
+  if (!isExpected(payload)) {
     throw new ApiError(response.status, {
       code: 'invalid_response',
-      message: 'Invalid server response.',
+      message: 'The server returned an unexpected response. Please try again.',
     })
   }
-  return payload as T
+  return payload
 }

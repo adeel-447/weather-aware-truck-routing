@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ApiError, postJson } from './client'
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
 function respond(status: number, body: unknown) {
   const fetchMock = vi
     .fn()
@@ -25,7 +28,7 @@ async function rejection(promise: Promise<unknown>): Promise<ApiError> {
 describe('postJson', () => {
   it('posts JSON and returns the parsed body', async () => {
     const fetchMock = respond(200, { ok: true })
-    await expect(postJson('/api/x/', { a: 1 })).resolves.toEqual({ ok: true })
+    await expect(postJson('/api/x/', { a: 1 }, isRecord)).resolves.toEqual({ ok: true })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url.endsWith('/api/x/')).toBe(true) // prefixed with VITE_API_BASE_URL when set
     expect(init.method).toBe('POST')
@@ -40,7 +43,7 @@ describe('postJson', () => {
         fields: { load_weight_lb: ['too high'] },
       },
     })
-    const error = await rejection(postJson('/api/x/', {}))
+    const error = await rejection(postJson('/api/x/', {}, isRecord))
     expect(error.status).toBe(400)
     expect(error.code).toBe('invalid_request')
     expect(error.fields).toEqual({ load_weight_lb: ['too high'] })
@@ -50,27 +53,35 @@ describe('postJson', () => {
     respond(503, {
       error: { code: 'provider_rate_limited', message: 'Limit exceeded', provider: 'Open-Meteo' },
     })
-    const error = await rejection(postJson('/api/x/', {}))
+    const error = await rejection(postJson('/api/x/', {}, isRecord))
     expect(error.provider).toBe('Open-Meteo')
     expect(error.code).toBe('provider_rate_limited')
   })
 
   it('handles non-JSON error responses', async () => {
     respond(502, undefined)
-    const error = await rejection(postJson('/api/x/', {}))
+    const error = await rejection(postJson('/api/x/', {}, isRecord))
     expect(error.code).toBe('http_error')
     expect(error.message).toContain('502')
   })
 
   it('reports network failures without leaking internals', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-    const error = await rejection(postJson('/api/x/', {}))
+    const error = await rejection(postJson('/api/x/', {}, isRecord))
     expect(error.code).toBe('network_error')
     expect(error.status).toBe(0)
   })
 
   it('rethrows aborts so cancelled queries stay silent', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError')))
-    await expect(postJson('/api/x/', {})).rejects.toHaveProperty('name', 'AbortError')
+    await expect(postJson('/api/x/', {}, isRecord)).rejects.toHaveProperty('name', 'AbortError')
+  })
+
+  it('rejects a successful response that does not match the expected shape', async () => {
+    respond(200, { unexpected: true })
+    const isOk = (value: unknown): value is { ok: true } =>
+      typeof value === 'object' && value !== null && 'ok' in value
+    const error = await rejection(postJson('/api/x/', {}, isOk))
+    expect(error.code).toBe('invalid_response')
   })
 })
