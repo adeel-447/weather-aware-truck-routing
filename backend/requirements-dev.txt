@@ -1,0 +1,9 @@
+-r requirements.txt
+pytest==9.1.1
+pytest-django==4.14.0
+responses==0.26.3
+ruff==0.17.0
+mypy==2.4.0
+django-stubs==6.1.2
+djangorestframework-stubs==3.18.1
+types-requests==2.33.0.20261006
