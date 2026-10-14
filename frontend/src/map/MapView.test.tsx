@@ -13,7 +13,7 @@ function Layer() {
 }
 
 beforeEach(() => {
-  FakeMap.instances = []
+  FakeMap.instances.length = 0
 })
 
 describe('MapView', () => {

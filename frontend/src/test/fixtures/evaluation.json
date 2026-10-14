@@ -1,0 +1,515 @@
+{
+  "request": {
+    "origin": {
+      "label": "Chicago, IL, United States",
+      "lat": 41.88,
+      "lon": -87.63
+    },
+    "destination": {
+      "label": "Rockford, IL, United States",
+      "lat": 42.27,
+      "lon": -89.09
+    },
+    "departure_at": "2026-10-20T13:00:00Z",
+    "timezone": "America/Chicago",
+    "load_weight_lb": 38000,
+    "checkpoint_spacing_miles": 25,
+    "empty_truck_weight_lb": 35000,
+    "routing_weight_lb": 73000
+  },
+  "recommendation": {
+    "status": "recommended",
+    "route_id": "A",
+    "reason": "Route A recommended: equal Severe and High miles; lowest average risk (0.31 vs 0.66 on route C)."
+  },
+  "routes": [
+    {
+      "id": "A",
+      "rank": 1,
+      "standing": "recommended",
+      "is_recommended": true,
+      "note": "Route A recommended: equal Severe and High miles; lowest average risk (0.31 vs 0.66 on route C).",
+      "eligible": true,
+      "verified": true,
+      "distance_miles": 90.0,
+      "duration_seconds": 5400,
+      "departure_at": "2026-10-20T13:00:00Z",
+      "arrival_at": "2026-10-20T14:30:00Z",
+      "eta_method": "provider_segments",
+      "severity_miles": {
+        "low": 62.5,
+        "moderate": 27.5,
+        "high": 0.0,
+        "severe": 0.0,
+        "no_travel": 0.0,
+        "unknown": 0.0
+      },
+      "weighted_average_risk": 0.306,
+      "notices": [],
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-87.63, 41.88],
+          [-88.3, 42.05],
+          [-89.09, 42.27]
+        ]
+      },
+      "checkpoints": [
+        {
+          "index": 0,
+          "distance_miles": 0.0,
+          "lat": 41.88,
+          "lon": -87.63,
+          "eta": "2026-10-20T13:00:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 0.0,
+          "interval_end_miles": 12.5
+        },
+        {
+          "index": 1,
+          "distance_miles": 25.0,
+          "lat": 41.98334,
+          "lon": -88.03729,
+          "eta": "2026-10-20T13:25:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 12.5,
+          "interval_end_miles": 37.5
+        },
+        {
+          "index": 2,
+          "distance_miles": 50.0,
+          "lat": 42.08995,
+          "lon": -88.44344,
+          "eta": "2026-10-20T13:50:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 37.5,
+          "interval_end_miles": 62.5
+        },
+        {
+          "index": 3,
+          "distance_miles": 75.0,
+          "lat": 42.20248,
+          "lon": -88.84754,
+          "eta": "2026-10-20T14:15:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 62.5,
+          "interval_end_miles": 82.5
+        },
+        {
+          "index": 4,
+          "distance_miles": 90.0,
+          "lat": 42.27,
+          "lon": -89.09,
+          "eta": "2026-10-20T14:30:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 82.5,
+          "interval_end_miles": 90.0
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "rank": 2,
+      "standing": "eligible",
+      "is_recommended": false,
+      "note": "Eligible; ranked lower on the criteria.",
+      "eligible": true,
+      "verified": true,
+      "distance_miles": 110.0,
+      "duration_seconds": 6600,
+      "departure_at": "2026-10-20T13:00:00Z",
+      "arrival_at": "2026-10-20T14:50:00Z",
+      "eta_method": "proportional",
+      "severity_miles": {
+        "low": 37.5,
+        "moderate": 72.5,
+        "high": 0.0,
+        "severe": 0.0,
+        "no_travel": 0.0,
+        "unknown": 0.0
+      },
+      "weighted_average_risk": 0.659,
+      "notices": [],
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-87.63, 41.88],
+          [-88.0, 42.4],
+          [-89.09, 42.27]
+        ]
+      },
+      "checkpoints": [
+        {
+          "index": 0,
+          "distance_miles": 0.0,
+          "lat": 41.88,
+          "lon": -87.63,
+          "eta": "2026-10-20T13:00:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 0.0,
+          "interval_end_miles": 12.5
+        },
+        {
+          "index": 1,
+          "distance_miles": 25.0,
+          "lat": 42.16224,
+          "lon": -87.83082,
+          "eta": "2026-10-20T13:25:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 12.5,
+          "interval_end_miles": 37.5
+        },
+        {
+          "index": 2,
+          "distance_miles": 50.0,
+          "lat": 42.39199,
+          "lon": -88.06716,
+          "eta": "2026-10-20T13:50:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 37.5,
+          "interval_end_miles": 62.5
+        },
+        {
+          "index": 3,
+          "distance_miles": 75.0,
+          "lat": 42.34116,
+          "lon": -88.49335,
+          "eta": "2026-10-20T14:15:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 62.5,
+          "interval_end_miles": 87.5
+        },
+        {
+          "index": 4,
+          "distance_miles": 100.0,
+          "lat": 42.29033,
+          "lon": -88.91953,
+          "eta": "2026-10-20T14:40:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 87.5,
+          "interval_end_miles": 105.0
+        },
+        {
+          "index": 5,
+          "distance_miles": 110.0,
+          "lat": 42.27,
+          "lon": -89.09,
+          "eta": "2026-10-20T14:50:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 105.0,
+          "interval_end_miles": 110.0
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "rank": 3,
+      "standing": "no_travel",
+      "is_recommended": false,
+      "note": "Not eligible: 50.0 mi of No Travel conditions.",
+      "eligible": false,
+      "verified": true,
+      "distance_miles": 120.0,
+      "duration_seconds": 7200,
+      "departure_at": "2026-10-20T13:00:00Z",
+      "arrival_at": "2026-10-20T15:00:00Z",
+      "eta_method": "provider_segments",
+      "severity_miles": {
+        "low": 60.0,
+        "moderate": 10.0,
+        "high": 0.0,
+        "severe": 0.0,
+        "no_travel": 50.0,
+        "unknown": 0.0
+      },
+      "weighted_average_risk": 1.75,
+      "notices": [],
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-87.63, 41.88],
+          [-88.0817, 41.525],
+          [-89.09, 42.27]
+        ]
+      },
+      "checkpoints": [
+        {
+          "index": 0,
+          "distance_miles": 0.0,
+          "lat": 41.88,
+          "lon": -87.63,
+          "eta": "2026-10-20T13:00:00Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 0.0,
+          "interval_end_miles": 12.5
+        },
+        {
+          "index": 1,
+          "distance_miles": 25.0,
+          "lat": 41.64632,
+          "lon": -87.92734,
+          "eta": "2026-10-20T13:20:50Z",
+          "weather": {
+            "wind_mph": 60.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "no_travel",
+          "severity_score": 4,
+          "factors": ["wind"],
+          "interval_start_miles": 12.5,
+          "interval_end_miles": 37.5
+        },
+        {
+          "index": 2,
+          "distance_miles": 50.0,
+          "lat": 41.63419,
+          "lon": -88.22948,
+          "eta": "2026-10-20T13:41:40Z",
+          "weather": {
+            "wind_mph": 60.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "no_travel",
+          "severity_score": 4,
+          "factors": ["wind"],
+          "interval_start_miles": 37.5,
+          "interval_end_miles": 62.5
+        },
+        {
+          "index": 3,
+          "distance_miles": 75.0,
+          "lat": 41.86127,
+          "lon": -88.53681,
+          "eta": "2026-10-20T14:07:30Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 62.5,
+          "interval_end_miles": 87.5
+        },
+        {
+          "index": 4,
+          "distance_miles": 100.0,
+          "lat": 42.08834,
+          "lon": -88.84414,
+          "eta": "2026-10-20T14:36:40Z",
+          "weather": {
+            "wind_mph": 5.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "low",
+          "severity_score": 0,
+          "factors": [],
+          "interval_start_miles": 87.5,
+          "interval_end_miles": 110.0
+        },
+        {
+          "index": 5,
+          "distance_miles": 120.0,
+          "lat": 42.27,
+          "lon": -89.09,
+          "eta": "2026-10-20T15:00:00Z",
+          "weather": {
+            "wind_mph": 30.0,
+            "rain_in_hr": 0.0,
+            "snow_in_hr": 0.0
+          },
+          "severity": "moderate",
+          "severity_score": 1,
+          "factors": ["wind"],
+          "interval_start_miles": 110.0,
+          "interval_end_miles": 120.0
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "code": "no_travel",
+      "message": "Route B: 50.0 mi of No Travel conditions at the estimated arrival times.",
+      "route_id": "B"
+    },
+    {
+      "code": "eta_approximated",
+      "message": "Route C: provider segment timing unavailable; ETAs assume constant average speed.",
+      "route_id": "C"
+    }
+  ],
+  "corridor": [
+    [-87.63, 41.88],
+    [-87.71146, 41.90067],
+    [-87.79292, 41.92134],
+    [-87.87437, 41.94201],
+    [-87.95583, 41.96267],
+    [-88.03729, 41.98334],
+    [-88.11875, 42.00401],
+    [-88.2002, 42.02468],
+    [-88.28166, 42.04535],
+    [-88.36262, 42.06744],
+    [-88.44344, 42.08995],
+    [-88.52426, 42.11245],
+    [-88.60508, 42.13496],
+    [-88.6859, 42.15747],
+    [-88.76672, 42.17997],
+    [-88.84754, 42.20248],
+    [-88.92836, 42.22499],
+    [-89.00918, 42.24749],
+    [-89.09, 42.27],
+    [-87.63, 41.88],
+    [-87.68947, 41.83326],
+    [-87.74894, 41.78653],
+    [-87.8084, 41.73979],
+    [-87.86787, 41.69305],
+    [-87.92734, 41.64632],
+    [-87.98681, 41.59958],
+    [-88.04627, 41.55284],
+    [-88.10655, 41.54336],
+    [-88.16801, 41.58878],
+    [-88.22948, 41.63419],
+    [-88.29095, 41.67961],
+    [-88.35241, 41.72502],
+    [-88.41388, 41.77044],
+    [-88.47534, 41.81585],
+    [-88.53681, 41.86127],
+    [-88.59827, 41.90668],
+    [-88.65974, 41.9521],
+    [-88.72121, 41.99751],
+    [-88.78267, 42.04293],
+    [-88.84414, 42.08834],
+    [-88.9056, 42.13376],
+    [-88.96707, 42.17917],
+    [-89.02853, 42.22459],
+    [-89.09, 42.27],
+    [-87.63, 41.88],
+    [-87.67016, 41.93645],
+    [-87.71033, 41.9929],
+    [-87.75049, 42.04934],
+    [-87.79066, 42.10579],
+    [-87.83082, 42.16224],
+    [-87.87099, 42.21869],
+    [-87.91115, 42.27514],
+    [-87.95132, 42.33158],
+    [-87.99148, 42.38803],
+    [-88.06716, 42.39199],
+    [-88.1524, 42.38182],
+    [-88.23764, 42.37166],
+    [-88.32287, 42.36149],
+    [-88.40811, 42.35133],
+    [-88.49335, 42.34116],
+    [-88.57858, 42.33099],
+    [-88.66382, 42.32083],
+    [-88.74905, 42.31066],
+    [-88.83429, 42.3005],
+    [-88.91953, 42.29033],
+    [-89.00476, 42.28017],
+    [-89.09, 42.27]
+  ],
+  "heatmap_reference_at": "2026-10-20T13:00:00Z",
+  "provider": {
+    "routing": "HERE Routing API v8 (truck)",
+    "weather": "Open-Meteo hourly forecast",
+    "routes_requested": 3,
+    "routes_returned": 3,
+    "duplicates_removed": 0
+  },
+  "assumptions": [
+    "ETAs are driving time from the routing provider; rest, fuel and hours-of-service stops are not modeled.",
+    "Weather risk load rules use the entered cargo load; truck routing uses empty truck weight + cargo.",
+    "Wind is sustained 10 m wind speed, interpolated between forecast hours; rain and snow are the forecast hour containing the ETA.",
+    "Checkpoint risk applies to the route stretch between the midpoints to neighbouring checkpoints.",
+    "Missing forecast data is Unknown, never Low; routes with Unknown miles are not recommended."
+  ],
+  "generated_at": "2026-10-20T12:00:00Z"
+}

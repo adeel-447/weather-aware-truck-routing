@@ -1,10 +1,15 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl'
+import { Map as MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { config } from '../config'
 import { MapContext } from './MapContext'
+
+// MapLibre looks for its worker next to its own module file, which no longer exists once Vite has
+// bundled the library (dev pre-bundling and production). Point it at the asset Vite serves/emits.
+setWorkerUrl(workerUrl)
 
 const INITIAL_VIEW = { center: [-96, 39] as [number, number], zoom: 3.5 } // contiguous US
 

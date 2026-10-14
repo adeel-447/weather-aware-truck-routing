@@ -71,10 +71,15 @@ h1 {
   min-height: 0;
 }
 
-.map-view,
-.map-view__canvas {
+.map-view {
   position: absolute;
   inset: 0;
+}
+
+/* MapLibre adds .maplibregl-map (position: relative) to this element, so size it explicitly. */
+.map-view__canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .map-view__status {
@@ -89,6 +94,493 @@ h1 {
   border-radius: var(--radius);
 }
 
+/* --- Panel ------------------------------------------------------------------------------- */
+
+.app__header {
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.empty-state {
+  margin: 1.25rem 0 0;
+  color: var(--text-muted);
+}
+
+/* --- Form -------------------------------------------------------------------------------- */
+
+.trip-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field label,
+.field legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.button:focus-visible,
+.route-card:focus-visible,
+.segmented__option input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--sev-severe);
+}
+
+.field__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.field__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--sev-severe);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.segmented__options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented__option {
+  position: relative;
+  font-weight: 400 !important;
+}
+
+.segmented__option input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+}
+
+.segmented__option span {
+  display: block;
+  padding: 0.45rem 0;
+  text-align: center;
+  cursor: pointer;
+}
+
+.segmented__option + .segmented__option span {
+  border-left: 1px solid var(--border);
+}
+
+.segmented__option input:checked + span {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.button {
+  min-height: 2.6rem;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.button--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* --- Results ----------------------------------------------------------------------------- */
+
+.results {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.results__section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.section-heading__meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.banner {
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  border-left: 4px solid;
+}
+
+.banner p,
+.banner ul {
+  margin: 0.3rem 0 0;
+}
+
+.banner ul {
+  padding-left: 1.1rem;
+}
+
+.banner--recommended {
+  background: #e9f6ee;
+  border-color: var(--sev-low);
+}
+
+.banner--warning {
+  background: #fdf6e3;
+  border-color: var(--sev-moderate);
+}
+
+.banner--danger {
+  background: #fdecec;
+  border-color: var(--sev-severe);
+}
+
+.banner--no-travel {
+  background: #f3e8fb;
+  border-color: var(--sev-no-travel);
+  color: #3f0868;
+}
+
+.info-note,
+.notes__item {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.notes {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.route-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-card {
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.8rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+}
+
+.route-card:hover {
+  border-color: #b9c0cc;
+}
+
+.route-card--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.route-card--no_travel {
+  background: #fbf7fe;
+}
+
+.route-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.route-card__swatch {
+  width: 1.4rem;
+  height: 0.35rem;
+  border-radius: 2px;
+}
+
+.route-card__name {
+  font-weight: 700;
+  flex: 1;
+}
+
+.badge {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: var(--text-muted);
+}
+
+.badge--recommended {
+  background: var(--sev-low);
+  color: #fff;
+}
+
+.badge--no_travel {
+  background: var(--sev-no-travel);
+  color: #fff;
+}
+
+.badge--unverified {
+  background: #fdf6e3;
+  color: #7a5c00;
+}
+
+.route-card__stats,
+.route-card__risk {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.route-card__risk {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.route-card__stats > span,
+.risk-figure {
+  display: grid;
+  min-width: 0;
+}
+
+.stat__label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.stat__value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-figure--no-travel .stat__value {
+  color: var(--sev-no-travel);
+}
+
+.risk-figure--severe .stat__value {
+  color: var(--sev-severe);
+}
+
+.risk-figure--high .stat__value {
+  color: #b85a0c;
+}
+
+.risk-figure--unknown .stat__value {
+  color: #5f646c;
+}
+
+.route-card__note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.severity-bar {
+  display: flex;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef0f3;
+}
+
+.severity-bar__part {
+  height: 100%;
+}
+
+.checkpoints summary,
+.assumptions summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.checkpoints__table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.checkpoints__table th,
+.checkpoints__table td {
+  padding: 0.3rem 0.25rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.severity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.severity-pill__dot,
+.legend__dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 15%);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.summary-grid dt {
+  color: var(--text-muted);
+}
+
+.summary-grid dd {
+  margin: 0;
+}
+
+.assumptions__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* --- Map overlays ------------------------------------------------------------------------ */
+
+.legend,
+.map-overlay {
+  position: absolute;
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+.legend {
+  left: 0.75rem;
+  bottom: 1.75rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.legend__title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.legend__items {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.2rem 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend__items li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.map-overlay {
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+}
+
+.checkpoint-popup {
+  font-size: 0.82rem;
+}
+
+.checkpoint-popup dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.6rem;
+  margin: 0.4rem 0 0;
+}
+
+.checkpoint-popup dt {
+  color: var(--text-muted);
+}
+
+.checkpoint-popup dd {
+  margin: 0;
+}
+
 @media (max-width: 800px) {
   .app {
     grid-template-columns: 1fr;
@@ -97,6 +589,10 @@ h1 {
 
   .app__map {
     grid-row: 1;
+  }
+
+  .route-card__risk {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .app__panel {
