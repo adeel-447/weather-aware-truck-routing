@@ -1,11 +1,11 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createQueryClient } from './api/queryClient'
 import App from './App'
-import { evaluationFixture } from './test/fixtures'
+import { evaluationFixture, heatmapFixture } from './test/fixtures'
 import { FakeMap, lastMap } from './test/maplibreMock'
 
 vi.mock('maplibre-gl', async () => (await import('./test/maplibreMock')).maplibreMock)
@@ -25,7 +25,7 @@ function mockApi(status: number, body: unknown) {
   const fetchMock = vi.fn((url: string) =>
     Promise.resolve(
       url.includes('/api/heatmap/')
-        ? new Response('{}', { status: 200 })
+        ? new Response(JSON.stringify(heatmapFixture()), { status: 200 })
         : new Response(JSON.stringify(body), { status }),
     ),
   )
@@ -102,10 +102,15 @@ describe('App', () => {
 describe('App re-evaluation', () => {
   it('keeps the previous results visible while re-evaluating and after a failure', async () => {
     let respond: (r: Response) => void = () => undefined
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(evaluationFixture()), { status: 200 }))
-      .mockImplementationOnce(() => new Promise<Response>((resolve) => (respond = resolve)))
+    const evaluateResponses = [
+      () => Promise.resolve(new Response(JSON.stringify(evaluationFixture()), { status: 200 })),
+      () => new Promise<Response>((resolve) => (respond = resolve)),
+    ]
+    const fetchMock = vi.fn((url: string) =>
+      url.includes('/api/heatmap/')
+        ? Promise.resolve(new Response(JSON.stringify(heatmapFixture()), { status: 200 }))
+        : evaluateResponses.shift()!(),
+    )
     vi.stubGlobal('fetch', fetchMock)
     renderApp()
     await fillAndSubmit()
@@ -127,5 +132,26 @@ describe('App re-evaluation', () => {
     expect(await screen.findByText(/previous results are still shown/)).toBeInTheDocument()
     expect(screen.getByText('Recommended: Route A')).toBeInTheDocument()
     expect(lastMap().addSource.mock.calls.length).toBe(sourcesBefore) // layers never re-created
+  })
+})
+
+describe('App heatmap', () => {
+  it('scrubs forecast valid time without new requests or changing the recommendation', async () => {
+    const fetchMock = mockApi(200, evaluationFixture())
+    renderApp()
+    await fillAndSubmit()
+    const slider = await screen.findByRole('slider')
+    const requestsBefore = fetchMock.mock.calls.map(([url]) => url)
+    expect(requestsBefore.filter((u) => u.includes('/api/heatmap/'))).toHaveLength(1)
+    expect(screen.getByText('Departure hour')).toBeInTheDocument()
+
+    fireEvent.change(slider, { target: { value: '12' } })
+    expect(screen.getByText('+12 h')).toBeInTheDocument()
+    expect(slider).toHaveAttribute('aria-valuetext', expect.stringContaining('+12 h'))
+    fireEvent.change(slider, { target: { value: '30' } })
+
+    expect(fetchMock.mock.calls).toHaveLength(requestsBefore.length) // no request per slider move
+    expect(screen.getByText('Recommended: Route A')).toBeInTheDocument() // ETA scoring unchanged
+    expect(screen.getByText(/separate from checkpoint risk/)).toBeInTheDocument()
   })
 })

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 
 import { ApiError } from './api/client'
-import { useEvaluateRoutes } from './api/hooks'
+import { useEvaluateRoutes, useHeatmap } from './api/hooks'
 import { CheckpointList } from './components/CheckpointList'
+import { HeatmapPanel } from './components/HeatmapPanel'
 import { RecommendationBanner } from './components/RecommendationBanner'
 import { RouteComparison } from './components/RouteComparison'
 import { SeverityLegend } from './components/SeverityLegend'
@@ -11,6 +12,7 @@ import { TripSummary } from './components/TripSummary'
 import { serverFieldErrors } from './components/tripValidation'
 import { WarningList } from './components/WarningList'
 import { CheckpointLayer } from './map/CheckpointLayer'
+import { HeatmapLayer } from './map/HeatmapLayer'
 import { MapView } from './map/MapView'
 import { RouteLayers } from './map/RouteLayers'
 import type { EvaluateRequest, EvaluateResponse } from './types/api'
@@ -27,6 +29,10 @@ export default function App() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [hoveredRouteId, setHoveredRouteId] = useState<string | null>(null)
   const [focus, setFocus] = useState<{ index: number } | null>(null)
+  const [heatmapOffset, setHeatmapOffset] = useState(0)
+  const [heatmapVisible, setHeatmapVisible] = useState(true)
+  // One request per evaluation returns all 49 frames; the slider never fetches.
+  const heatmap = useHeatmap(evaluation ?? undefined)
 
   const selectedRoute = evaluation?.routes.find((r) => r.id === selectedRouteId) ?? null
   // Colours follow the provider's route ids, so a route keeps its colour regardless of rank.
@@ -56,6 +62,7 @@ export default function App() {
     evaluate.mutate(request, {
       onSuccess: (result) => {
         setEvaluation(result)
+        setHeatmapOffset(0)
         setSelectedRouteId(defaultSelection(result))
         setHoveredRouteId(null)
       },
@@ -127,6 +134,12 @@ export default function App() {
         <MapView>
           {evaluation && (
             <>
+              {/* Rendered first so its fill layer sits beneath the route lines. */}
+              <HeatmapLayer
+                heatmap={heatmap.data}
+                offsetHours={heatmapOffset}
+                visible={heatmapVisible}
+              />
               <RouteLayers
                 routes={evaluation.routes}
                 colorIndex={colorIndex}
@@ -145,6 +158,18 @@ export default function App() {
           )}
         </MapView>
         {evaluation && <SeverityLegend />}
+        {evaluation && (
+          <HeatmapPanel
+            heatmap={heatmap.data}
+            isLoading={heatmap.isPending}
+            error={heatmap.error}
+            offsetHours={heatmapOffset}
+            onOffsetChange={setHeatmapOffset}
+            visible={heatmapVisible}
+            onVisibleChange={setHeatmapVisible}
+            timeZone={evaluation.request.timezone}
+          />
+        )}
         {evaluate.isPending && (
           <div className="map-overlay" role="status">
             Evaluating routes and forecasts…

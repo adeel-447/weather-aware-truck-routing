@@ -520,6 +520,100 @@ h2 {
   color: var(--text-muted);
 }
 
+/* --- Heatmap panel ------------------------------------------------------------------------ */
+
+.heatmap-panel {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 1.75rem;
+  width: min(340px, calc(100% - 1.5rem));
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.8rem;
+  background: rgb(255 255 255 / 96%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+.heatmap-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heatmap-panel__header h2 {
+  font-size: 0.9rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+
+.heatmap-panel__time {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap-panel__offset {
+  color: var(--accent);
+}
+
+.heatmap-panel__slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.heatmap-panel__scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -0.3rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.heatmap-panel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heatmap-panel__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.legend__dot--faint {
+  opacity: 0.4;
+}
+
+.heatmap-panel__hint {
+  margin: -0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.heatmap-panel__status,
+.heatmap-panel__note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.heatmap-panel__status--error {
+  color: var(--sev-severe);
+}
+
 /* --- Map overlays ------------------------------------------------------------------------ */
 
 .legend,
@@ -589,7 +683,7 @@ h2 {
 @media (max-width: 800px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 55vh auto;
+    grid-template-rows: 65vh auto;
   }
 
   .app__map {
@@ -598,6 +692,26 @@ h2 {
 
   .route-card__risk {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .legend {
+    top: 0.5rem;
+    bottom: auto;
+    left: 0.5rem;
+  }
+
+  .heatmap-panel {
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 1.9rem; /* clear of the map attribution */
+    width: auto;
+    gap: 0.3rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  /* The one-line hint stays; the full explanation is too tall for a phone-sized map. */
+  .heatmap-panel__note {
+    display: none;
   }
 
   .app__panel {

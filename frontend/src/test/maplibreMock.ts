@@ -29,8 +29,11 @@ export class FakeMap {
   removeSource = vi.fn((id: string) => {
     this.sources.delete(id)
   })
-  addLayer = vi.fn((layer: { id: string }) => {
+  /** Layer id -> the layer it was inserted beneath (MapLibre's beforeId), if any. */
+  readonly insertedBelow = new Map<string, string | undefined>()
+  addLayer = vi.fn((layer: { id: string }, beforeId?: string) => {
     this.layers.add(layer.id)
+    this.insertedBelow.set(layer.id, beforeId)
   })
   getLayer = vi.fn((id: string) => (this.layers.has(id) ? { id } : undefined))
   removeLayer = vi.fn((id: string) => {

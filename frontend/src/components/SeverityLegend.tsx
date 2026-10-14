@@ -3,7 +3,7 @@ import { SEVERITY_COLORS, SEVERITY_LABELS, SEVERITY_ORDER } from '../theme'
 export function SeverityLegend() {
   return (
     <div className="legend" aria-label="Checkpoint risk legend">
-      <span className="legend__title">Checkpoint risk at ETA</span>
+      <span className="legend__title">Checkpoint risk at each ETA</span>
       <ul className="legend__items">
         {SEVERITY_ORDER.map((severity) => (
           <li key={severity}>
