@@ -27,6 +27,9 @@ export function RouteComparison({
           {routes.length} of {provider.routes_requested} requested
         </span>
       </div>
+      <p className="info-note">
+        Drive times exclude rest stops, fuel stops and hours-of-service breaks.
+      </p>
       {routes.length < provider.routes_requested && (
         <p className="info-note">
           The routing provider returned {routes.length === 1 ? 'only one' : `only ${routes.length}`}{' '}

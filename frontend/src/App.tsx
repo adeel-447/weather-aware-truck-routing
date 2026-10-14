@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ApiError } from './api/client'
+import { describeError } from './api/errorMessages'
 import { useEvaluateRoutes, useHeatmap } from './api/hooks'
 import { CheckpointList } from './components/CheckpointList'
 import { HeatmapPanel } from './components/HeatmapPanel'
@@ -47,17 +48,32 @@ export default function App() {
   const error = evaluate.error
   // Memoized so TripForm sees a new object only when a new error arrives.
   const fieldErrors = useMemo(
-    () =>
-      error instanceof ApiError && error.code === 'invalid_request'
-        ? serverFieldErrors(error.fields)
-        : undefined,
+    () => (error instanceof ApiError && error.fields ? serverFieldErrors(error.fields) : undefined),
     [error],
   )
   const hasFieldErrors = fieldErrors !== undefined && Object.keys(fieldErrors).length > 0
-  const errorMessage = error && !hasFieldErrors ? error.message : null
+  // Only input errors are shown purely inline; anything else keeps its banner (and retry option)
+  // even if the envelope also names fields.
+  const inlineOnly =
+    hasFieldErrors &&
+    error instanceof ApiError &&
+    (error.code === 'invalid_request' || error.code === 'place_not_found')
+  const errorInfo = error && !inlineOnly ? describeError(error) : null
+  const [lastRequest, setLastRequest] = useState<EvaluateRequest | null>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+
+  // On narrow screens results render below the form; bring a new result into view.
+  useEffect(() => {
+    const results = resultsRef.current
+    if (!results || typeof results.scrollIntoView !== 'function') return
+    if (results.getBoundingClientRect().top > window.innerHeight * 0.8) {
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [evaluation])
   const isRefreshing = evaluate.isPending && evaluation !== null
 
   function submit(request: EvaluateRequest) {
+    setLastRequest(request)
     setFocus(null)
     evaluate.mutate(request, {
       onSuccess: (result) => {
@@ -84,18 +100,39 @@ export default function App() {
           </p>
         </header>
 
-        <TripForm onSubmit={submit} isSubmitting={evaluate.isPending} serverErrors={fieldErrors} />
+        <TripForm
+          onSubmit={submit}
+          isSubmitting={evaluate.isPending}
+          serverErrors={fieldErrors}
+          onEdit={() => {
+            // Try again re-sends the failed trip; once the form changes, that would be stale.
+            setLastRequest(null)
+          }}
+        />
 
-        {errorMessage && (
+        {errorInfo && (
           <div className="banner banner--danger" role="alert">
-            <strong>Could not evaluate routes</strong>
-            <p>{errorMessage}</p>
+            <strong>{errorInfo.title}</strong>
+            <p>{errorInfo.message}</p>
             {evaluation && <p>The previous results are still shown below.</p>}
+            {errorInfo.retryable && lastRequest && (
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={evaluate.isPending}
+                onClick={() => {
+                  submit(lastRequest)
+                }}
+              >
+                Try again
+              </button>
+            )}
           </div>
         )}
 
         {evaluation && (
           <div
+            ref={resultsRef}
             className={`results${isRefreshing ? ' results--stale' : ''}`}
             aria-live="polite"
             aria-busy={isRefreshing}
@@ -161,8 +198,11 @@ export default function App() {
         {evaluation && (
           <HeatmapPanel
             heatmap={heatmap.data}
-            isLoading={heatmap.isPending}
-            error={heatmap.error}
+            isLoading={heatmap.isFetching && !heatmap.data}
+            error={heatmap.isFetching ? null : heatmap.error}
+            onRetry={() => {
+              void heatmap.refetch()
+            }}
             offsetHours={heatmapOffset}
             onOffsetChange={setHeatmapOffset}
             visible={heatmapVisible}

@@ -35,9 +35,11 @@ interface TripFormProps {
   isSubmitting: boolean
   serverErrors?: TripFormErrors | undefined
   initial?: TripFormValues | undefined
+  /** Called on every field change. */
+  onEdit?: (() => void) | undefined
 }
 
-export function TripForm({ onSubmit, isSubmitting, serverErrors, initial }: TripFormProps) {
+export function TripForm({ onSubmit, isSubmitting, serverErrors, initial, onEdit }: TripFormProps) {
   const [values, setValues] = useState<TripFormValues>(() => initial ?? initialValues())
   const [errors, setErrors] = useState<TripFormErrors>({})
   const [touchedSubmit, setTouchedSubmit] = useState(false)
@@ -65,6 +67,7 @@ export function TripForm({ onSubmit, isSubmitting, serverErrors, initial }: Trip
   function update<K extends keyof TripFormValues>(key: K, value: TripFormValues[K]) {
     const next = { ...values, [key]: value }
     setValues(next)
+    onEdit?.()
     if (serverErrors?.[key]) setEditedSinceServer((prev) => new Set(prev).add(key))
     if (touchedSubmit) setErrors(validateTrip(next))
   }

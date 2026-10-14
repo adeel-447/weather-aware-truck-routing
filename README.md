@@ -2,13 +2,14 @@
 
 React + Django app that compares up to three truck routes, scores each using forecast weather at the truck's estimated arrival time at every checkpoint, and recommends the safest route.
 
-> Status: backend complete and tested; map UI and corridor heatmap done. Error-state polish, deployment and demo in progress.
+> Status: backend, map UI, corridor heatmap and error states done and tested. Deployment and demo in progress.
 
 ## Using the app
 1. Enter origin and destination (place name or `lat,lon`), departure time and time zone, cargo weight and checkpoint spacing.
 2. The panel shows the recommendation and why, a prominent alert for any No Travel exposure, and one card per route (rank badge, distance, drive time, arrival, miles by risk level, average risk). Fewer than three routes are shown as-is with a note.
 3. Click a card or a route line to select it. Its checkpoints appear on the map coloured by risk at the ETA; click a marker, or a mile in the checkpoint table, for ETA, wind, rain, snow and the factors behind the risk.
 4. The **Corridor forecast** panel shows forecast risk across the trip corridor. Drag the slider from the departure hour to +48 h to see conditions at that valid time (exact time shown in the trip's time zone). Cells use the same risk rules and cargo load as route scoring; grey means no forecast. This view is independent of the recommendation, which always uses each checkpoint's ETA. All 49 hours load in one request, so scrubbing makes no network calls.
+5. **When something fails** the panel says what happened in plain language. A place that cannot be found, or an origin and destination that resolve to the same point, is shown under the relevant field (both fields for the same-point case). Temporary failures (timeouts, rate limits, provider outages, network loss) offer **Try again**, which re-sends the failed trip (the button disappears once you edit the form, so it never sends a stale trip); configuration problems such as a missing API key, and responses that would fail the same way again, do not. If only the heatmap fails, its panel says so and offers **Retry heatmap**; route scoring is unaffected. Earlier results stay on screen while re-evaluating or after a failure. If the weather provider is down, routes are still shown with every checkpoint Unknown and no recommendation.
 
 ## Structure
 - `backend/` — Django + DRF API. Pure business logic lives in `backend/routing/domain/`.

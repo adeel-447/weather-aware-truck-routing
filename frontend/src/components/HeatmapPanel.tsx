@@ -1,5 +1,6 @@
 import { useId } from 'react'
 
+import { describeError } from '../api/errorMessages'
 import { formatDateTime } from '../format'
 import { SEVERITY_COLORS, SEVERITY_LABELS } from '../theme'
 import type { HeatmapResponse, Severity } from '../types/api'
@@ -11,6 +12,7 @@ interface Props {
   heatmap: HeatmapResponse | undefined
   isLoading: boolean
   error: Error | null
+  onRetry: () => void
   offsetHours: number
   onOffsetChange: (offset: number) => void
   visible: boolean
@@ -26,6 +28,7 @@ export function HeatmapPanel({
   heatmap,
   isLoading,
   error,
+  onRetry,
   offsetHours,
   onOffsetChange,
   visible,
@@ -34,6 +37,7 @@ export function HeatmapPanel({
 }: Props) {
   const id = useId()
   const frame = heatmap?.frames[offsetHours]
+  const errorInfo = error ? describeError(error, 'heatmap') : null
   const validTime = frame ? formatDateTime(frame.valid_at, timeZone) : null
 
   return (
@@ -56,10 +60,18 @@ export function HeatmapPanel({
       </p>
 
       {isLoading && <p className="heatmap-panel__status">Loading the 48-hour forecast…</p>}
-      {error && (
-        <p className="heatmap-panel__status heatmap-panel__status--error" role="alert">
-          Heatmap unavailable: {error.message}
-        </p>
+      {errorInfo && (
+        <div className="heatmap-panel__status heatmap-panel__status--error" role="alert">
+          <p>
+            <strong>Heatmap unavailable.</strong> {errorInfo.title}. {errorInfo.message}
+          </p>
+          <p>Route scoring is not affected.</p>
+          {errorInfo.retryable && (
+            <button type="button" className="button button--secondary" onClick={onRetry}>
+              Retry heatmap
+            </button>
+          )}
+        </div>
       )}
 
       {heatmap && frame && (

@@ -21,6 +21,26 @@ function renderApp() {
   })
 }
 
+/** Fetch mock that serves the heatmap fixture and the given evaluate responses in order. */
+function sequenceApi(evaluateResponses: (() => Promise<Response>)[]) {
+  const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
+    if (url.includes('/api/heatmap/'))
+      return Promise.resolve(new Response(JSON.stringify(heatmapFixture()), { status: 200 }))
+    const next = evaluateResponses.shift()
+    if (!next) throw new Error(`unexpected extra evaluate request to ${url}`)
+    return next()
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+const json = (status: number, body: unknown) => () =>
+  Promise.resolve(new Response(JSON.stringify(body), { status }))
+
+const timeout = json(504, {
+  error: { code: 'provider_timeout', message: 'request timed out', provider: 'HERE' },
+})
+
 function mockApi(status: number, body: unknown) {
   const fetchMock = vi.fn((url: string) =>
     Promise.resolve(
@@ -80,7 +100,7 @@ describe('App', () => {
     renderApp()
     await fillAndSubmit()
     expect(await screen.findByText(/this local time does not exist/)).toBeInTheDocument()
-    expect(screen.queryByText('Could not evaluate routes')).not.toBeInTheDocument()
+    expect(screen.queryByText('Check the trip details')).not.toBeInTheDocument()
   })
 
   it('shows provider failures as an error banner', async () => {
@@ -94,24 +114,20 @@ describe('App', () => {
     renderApp()
     await fillAndSubmit()
     const alert = await screen.findByRole('alert')
-    expect(within(alert).getByText('Could not evaluate routes')).toBeInTheDocument()
+    expect(within(alert).getByText('HERE is not configured')).toBeInTheDocument()
     expect(alert).toHaveTextContent('HERE_API_KEY is not configured')
+    // A configuration problem is not fixed by retrying.
+    expect(within(alert).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 })
 
 describe('App re-evaluation', () => {
   it('keeps the previous results visible while re-evaluating and after a failure', async () => {
     let respond: (r: Response) => void = () => undefined
-    const evaluateResponses = [
-      () => Promise.resolve(new Response(JSON.stringify(evaluationFixture()), { status: 200 })),
+    sequenceApi([
+      json(200, evaluationFixture()),
       () => new Promise<Response>((resolve) => (respond = resolve)),
-    ]
-    const fetchMock = vi.fn((url: string) =>
-      url.includes('/api/heatmap/')
-        ? Promise.resolve(new Response(JSON.stringify(heatmapFixture()), { status: 200 }))
-        : evaluateResponses.shift()!(),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    ])
     renderApp()
     await fillAndSubmit()
     expect(await screen.findByText('Recommended: Route A')).toBeInTheDocument()
@@ -153,5 +169,99 @@ describe('App heatmap', () => {
     expect(fetchMock.mock.calls).toHaveLength(requestsBefore.length) // no request per slider move
     expect(screen.getByText('Recommended: Route A')).toBeInTheDocument() // ETA scoring unchanged
     expect(screen.getByText(/separate from checkpoint risk/)).toBeInTheDocument()
+  })
+})
+
+describe('App error recovery', () => {
+  it('offers Try again for temporary failures and re-sends the same trip', async () => {
+    const fetchMock = sequenceApi([timeout, json(200, evaluationFixture())])
+    renderApp()
+    await fillAndSubmit()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('HERE took too long to respond')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Recommended: Route A')).toBeInTheDocument()
+    const bodies = fetchMock.mock.calls
+      .filter(([url]) => url.includes('/api/routes/evaluate/'))
+      .map(([, init]) => init?.body)
+    expect(bodies).toHaveLength(2)
+    expect(bodies[1]).toBe(bodies[0])
+  })
+
+  it('shows a place that cannot be found under its field', async () => {
+    mockApi(422, {
+      error: {
+        code: 'place_not_found',
+        message: "no location found for 'Rockford, IL'",
+        provider: 'HERE',
+        fields: { destination: ["no location found for 'Rockford, IL'"] },
+      },
+    })
+    renderApp()
+    await fillAndSubmit()
+    expect(await screen.findByText("no location found for 'Rockford, IL'")).toBeInTheDocument()
+    expect(screen.getByLabelText('Destination')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+
+  it('states that drive times exclude rest and hours-of-service breaks', async () => {
+    mockApi(200, evaluationFixture())
+    renderApp()
+    await fillAndSubmit()
+    expect(
+      await screen.findByText(/exclude rest stops, fuel stops and hours-of-service/),
+    ).toBeInTheDocument()
+  })
+
+  it('hides Try again once the form is edited, so a retry never sends a stale trip', async () => {
+    sequenceApi([timeout])
+    renderApp()
+    await fillAndSubmit()
+    const alert = await screen.findByRole('alert')
+    expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Destination'), ' area')
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+    expect(screen.getByText('HERE took too long to respond')).toBeInTheDocument() // message stays
+  })
+
+  it('keeps the banner for provider errors even when the envelope names fields', async () => {
+    mockApi(503, {
+      error: {
+        code: 'provider_unavailable',
+        message: 'HTTP 503',
+        provider: 'HERE',
+        fields: { destination: ['lookup failed'] },
+      },
+    })
+    renderApp()
+    await fillAndSubmit()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('HERE is unavailable')
+    expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+
+  it('lets the user retry a failed heatmap without re-evaluating', async () => {
+    let heatmapCalls = 0
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>((url) => {
+      if (url.includes('/api/heatmap/')) {
+        heatmapCalls += 1
+        return heatmapCalls === 1
+          ? json(503, {
+              error: { code: 'provider_rate_limited', message: 'limit', provider: 'Open-Meteo' },
+            })()
+          : json(200, heatmapFixture())()
+      }
+      return json(200, evaluationFixture())()
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderApp()
+    await fillAndSubmit()
+    expect(await screen.findByText('Heatmap unavailable.')).toBeInTheDocument()
+    expect(screen.getByText('Route scoring is not affected.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Retry heatmap' }))
+    expect(await screen.findByRole('slider')).toBeInTheDocument()
+    const evaluateCalls = fetchMock.mock.calls.filter(([url]) => url.includes('/api/routes/'))
+    expect(evaluateCalls).toHaveLength(1)
+    expect(screen.getByText('Recommended: Route A')).toBeInTheDocument()
   })
 })

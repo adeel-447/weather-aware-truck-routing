@@ -227,6 +227,15 @@ h2 {
   color: #fff;
 }
 
+.button--secondary {
+  margin-top: 0.5rem;
+  padding: 0 0.9rem;
+  min-height: 2.2rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 .button:disabled {
   opacity: 0.65;
   cursor: progress;
@@ -611,7 +620,18 @@ h2 {
 }
 
 .heatmap-panel__status--error {
+  display: grid;
+  gap: 0.3rem;
   color: var(--sev-severe);
+}
+
+.heatmap-panel__status--error p {
+  margin: 0;
+}
+
+.heatmap-panel__status--error .button--secondary {
+  justify-self: start;
+  margin-top: 0;
 }
 
 /* --- Map overlays ------------------------------------------------------------------------ */

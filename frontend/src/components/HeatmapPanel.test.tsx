@@ -1,17 +1,21 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ApiError } from '../api/client'
 import { heatmapFixture } from '../test/fixtures'
 import { HeatmapPanel } from './HeatmapPanel'
 
 function setup(props: Partial<Parameters<typeof HeatmapPanel>[0]> = {}) {
   const onOffsetChange = vi.fn()
   const onVisibleChange = vi.fn()
+  const onRetry = vi.fn()
   render(
     <HeatmapPanel
       heatmap={heatmapFixture()}
       isLoading={false}
       error={null}
+      onRetry={onRetry}
       offsetHours={0}
       onOffsetChange={onOffsetChange}
       visible
@@ -20,7 +24,7 @@ function setup(props: Partial<Parameters<typeof HeatmapPanel>[0]> = {}) {
       {...props}
     />,
   )
-  return { onOffsetChange, onVisibleChange }
+  return { onOffsetChange, onVisibleChange, onRetry }
 }
 
 describe('HeatmapPanel', () => {
@@ -56,9 +60,29 @@ describe('HeatmapPanel', () => {
     expect(screen.getByText('Loading the 48-hour forecast…')).toBeInTheDocument()
   })
 
-  it('shows provider errors', () => {
-    setup({ heatmap: undefined, error: new Error('Minutely API request limit exceeded.') })
-    expect(screen.getByRole('alert')).toHaveTextContent('Minutely API request limit exceeded.')
+  it('shows provider errors in heatmap context with a retry', async () => {
+    const { onRetry } = setup({
+      heatmap: undefined,
+      error: new ApiError(503, {
+        code: 'provider_rate_limited',
+        message: 'Minutely API request limit exceeded.',
+        provider: 'Open-Meteo',
+      }),
+    })
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Heatmap unavailable. Open-Meteo is busy.')
+    expect(alert).toHaveTextContent('Route scoring is not affected.')
+    await userEvent.click(within(alert).getByRole('button', { name: 'Retry heatmap' }))
+    expect(onRetry).toHaveBeenCalledOnce()
+  })
+
+  it('does not offer a retry for errors a retry cannot fix', () => {
+    setup({
+      heatmap: undefined,
+      error: new ApiError(400, { code: 'invalid_request', message: 'Request validation failed.' }),
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('The forecast request was rejected')
+    expect(screen.queryByRole('button', { name: 'Retry heatmap' })).not.toBeInTheDocument()
   })
 
   it('toggles visibility and disables the slider while hidden', () => {
