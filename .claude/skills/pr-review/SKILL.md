@@ -5,7 +5,7 @@ description: Review a diff, branch or PR in this repo against the project's codi
 
 # PR review skill
 
-Project rules live in root `CLAUDE.md` (decisions, thresholds, workflow, commits) and
+Project rules live in root `CLAUDE.md` (decisions, workflow, commits) and
 `.claude/skills/weather-routing/SKILL.md` (domain algorithms). This skill does not restate them; it
 says how to check a change against them. When the two disagree with this file, they win.
 
@@ -34,7 +34,7 @@ A skipped, xfailed or loosened test or lint rule without a stated reason is a fi
   and imported, not copied.
 
 ### Domain correctness (highest weight)
-- Thresholds compared on exact values, half-open intervals as in `CLAUDE.md`; no rounding before
+- Thresholds compared on exact values, half-open intervals as in the weather-routing skill; no rounding before
   classification. New boundary logic has tests at the listed edge values.
 - Missing data is Unknown, never Low or zero; Unknown miles make a route unverified.
 - No Travel always makes a route ineligible and is never counted as Severe.
@@ -54,7 +54,7 @@ A skipped, xfailed or loosened test or lint rule without a stated reason is a fi
 - Unverified API fields or parameters are a finding unless documented in README with a source.
 
 ### API contract
-- Serializer validation mirrors `CLAUDE.md` input rules; response fields match
+- Serializer validation mirrors the `CLAUDE.md` inputs and the skill's API contract; response fields match
   `frontend/src/types/api.ts` (update both sides together).
 - Error envelope is always `{"error": {"code", "message", ...}}`.
 

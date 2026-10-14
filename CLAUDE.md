@@ -12,20 +12,20 @@ Build a production-minded, demo-ready React + Django web app that compares up to
 ## Repository layout
 ```
 CLAUDE.md                          project-wide instructions (this file)
-.claude/skills/weather-routing/    domain skill: risk, sampling, ranking, heatmap
+.claude/skills/weather-routing/    domain reference: thresholds, algorithms, providers, API contract, test cases
 .claude/skills/pr-review/          review checklist: layering, invariants, quality gates, report format
 backend/                           Django + DRF API
   config/                          settings (env-driven), urls, wsgi
-  routing/                         Django app: views, serializers, urls
-    domain/                        pure logic, no I/O: types, risk, sampling, eta, ranking, heatmap grid
-    providers/                     adapters: HERE routing/geocoding, Open-Meteo weather (+ fakes)
-    services/                      orchestration: evaluate_routes, corridor_heatmap
-  tests/                           pytest; domain unit tests, adapter tests with recorded fixtures
+  routing/                         Django app: views, serializers, urls, error envelope
+    domain/                        pure logic, no I/O: types, risk, sampling, eta, forecast, ranking, heatmap grid
+    providers/                     adapters: HERE routing/geocoding, Open-Meteo weather, HTTP client, cache
+    services/                      orchestration: evaluate_trip, corridor_heatmap
+  tests/                           pytest; domain, provider (recorded/synthetic fixtures), service and API tests
 frontend/                          React + TypeScript + Vite
   src/api/                         typed client + TanStack Query hooks
-  src/components/                  TripForm, RouteComparison, CheckpointPanel, Alerts
-  src/map/                         MapView (single instance), layers, legend, HeatmapSlider
-  src/types/                       API types mirroring backend serializers
+  src/components/                  trip form, recommendation, route comparison, checkpoints, warnings
+  src/map/                         MapView (single instance), route and checkpoint layers
+  src/types/                       API types mirroring backend responses
 README.md                          setup, providers, assumptions, deployment, tests, demo script
 .env.example                       variable names only, no secrets
 ```
@@ -34,54 +34,30 @@ Business logic belongs in `backend/routing/domain/`. Views and providers stay th
 ## Stack and providers
 - Frontend: React + TypeScript, Vite, MapLibre GL JS (OpenFreeMap style, no key), TanStack Query, accessible controls.
 - Backend: Django + DRF, typed service boundaries (dataclasses), pytest, ruff, mypy.
-- Providers sit behind replaceable adapters selected by env (`ROUTING_PROVIDER`, `GEOCODING_PROVIDER`, `WEATHER_PROVIDER`). All URLs, keys, timeouts and retry counts come from env; see `.env.example`.
-- **Routing: HERE Routing API v8** (`GET /v8/routes`, `transportMode=truck`, `alternatives` 0–6, `vehicle[grossWeight]`, `return=polyline,summary`, `spans=duration,length`, `departureTime` RFC 3339, `apiKey` query param). Use `vehicle[...]`, never the deprecated `truck[...]` params. Decode flexible polylines with the official `flexpolyline` package.
-- **Geocoding: HERE Geocoding & Search v7** (`/v1/geocode`).
-- **Weather: Open-Meteo forecast** (keyless non-commercial; `wind_speed_unit=mph`, `precipitation_unit=inch`, `timezone=GMT`, `timeformat=unixtime`, multi-location comma-separated, horizon ≤16 days).
+- Providers sit behind replaceable adapters selected by env (`ROUTING_PROVIDER`, `GEOCODING_PROVIDER`, `WEATHER_PROVIDER`). All URLs, keys, timeouts and retry settings come from env; see `.env.example`.
+- Routing: HERE Routing API v8 (truck mode). Geocoding: HERE Geocoding & Search v7. Weather: Open-Meteo hourly forecast. Request parameters and verified response semantics are in the weather-routing skill.
 - Do not invent API capabilities or response fields. When a detail is unverified, verify it against docs or a recorded live response before relying on it, and note it in README.
-- Backend owns checkpoints, risk, ranking and normalized responses. Frontend only renders them; it never re-derives severity.
+- Backend owns checkpoints, risk, eligibility, ranking and normalized responses. Frontend only renders them; it never re-derives severity or eligibility.
 - Credentials stay server-side. No `VITE_*` variable may contain a secret.
 
 ## Key decisions (agreed; do not change without asking)
-- **Truck weight.** The user enters cargo load in lb; risk load rules use that value only. Routing weight = `TRUCK_EMPTY_WEIGHT_LB` (default 35,000) + cargo, sent to HERE as integer kg (`round(lb × 0.45359237)`, kg verified in the v8 OpenAPI spec) in both `vehicle[grossWeight]` and `vehicle[currentWeight]`. Validate cargo > 0 and ≤ 80,000 lb; warn when total exceeds 80,000 lb. The UI and README must state this assumption.
-- **Fewer than three routes.** Request `ROUTE_ALTERNATIVES=2` (up to 3 routes). HERE does not guarantee alternatives. Return what the provider gives, drop exact-duplicate geometries, add a `fewer_routes_than_requested` warning, and show it in the UI. Never fabricate or pad routes; never fall back to car routes.
-- **Forecast window.** Open-Meteo is queried with `past_hours=2` and `forecast_hours` sized to the latest ETA (≤ 384, bucketed 72/168/384 for caching); trailing nulls are unavailable. Locations snap to a 0.05° grid for dedupe/caching.
-- **Forecast timing.** All instants in UTC internally; display in the user's IANA timezone. Wind (instantaneous) is linearly interpolated between bracketing hours. Rain/snow (preceding-hour totals) use the bucket whose window contains the ETA: the first hourly timestamp ≥ ETA. ETA outside forecast coverage → weather unavailable (never current conditions). Rain = `rain + showers`; snow = `snowfall`.
-- **No Travel safety.** Any No Travel interval makes a route ineligible. All routes ineligible → `no_safe_route`, no route highlighted as recommended, prominent alert explaining which routes/miles and why. No Travel is never counted as Severe and always appears in summaries. Routes with unknown-weather miles are `unverified` and cannot be recommended as safest; if no route is eligible and verified because of missing data → `insufficient_data`.
-- **Heatmap performance.** One batched, cached backend request returns a bounded corridor grid (`HEATMAP_MAX_CELLS`, default 200; cells coarsen until it fits) with all 49 hourly frames (offsets 0–48 h from departure rounded down to the hour). The slider swaps precomputed frames client-side: no network per tick, map created once, only `setData`/`setPaintProperty`, redraws throttled with `requestAnimationFrame`. Heatmap never affects ETA-based scoring.
-- **ETA scope.** Driving time from HERE spans/summary only. Hours-of-service breaks, fuel and rest stops are not modeled; say so in README and UI.
+- **Truck weight.** The user enters cargo load in lb; weather load rules use that value only. Routing weight = `TRUCK_EMPTY_WEIGHT_LB` (default 35,000) + cargo, sent to HERE in kg. Validate cargo 1–80,000 lb; warn when the total exceeds 80,000 lb. UI and README state this assumption.
+- **Fewer than three routes.** Request `ROUTE_ALTERNATIVES=2` (up to 3 routes). Return what the provider gives, drop exact duplicates, warn `fewer_routes_than_requested`. Never fabricate or pad routes; never fall back to car routes.
+- **No Travel safety.** Any No Travel mileage makes a route ineligible. All routes ineligible → `no_safe_route`, nothing highlighted as recommended, prominent alert with routes and miles. No Travel is never counted as Severe and always appears in summaries.
+- **Unknown is never safe.** Missing weather is Unknown, never Low. Routes with Unknown miles are `unverified` and never recommended; if that leaves no candidate → `insufficient_data`.
+- **Forecast timing.** UTC internally, the user's IANA timezone for display. Weather is taken at each checkpoint's ETA; ETAs outside forecast coverage are unavailable, never replaced by current conditions.
+- **Heatmap.** One batched, cached request returns a bounded grid (`HEATMAP_MAX_CELLS`, default 200) with all 49 hourly frames (0–48 h from departure rounded down to the hour). The slider swaps precomputed frames: no network per tick, one map instance, `setData`/`setPaintProperty` only, redraws throttled with `requestAnimationFrame`. The heatmap never affects ETA-based scoring.
+- **ETA scope.** Driving time from the routing provider only; hours-of-service, fuel and rest stops are not modeled. Say so in README and UI.
 
-## Required user inputs
-Origin, destination, departure date/time with explicit IANA timezone (default: browser timezone), load weight (lb), checkpoint spacing (10, 25, or 50 miles). Validate: origin ≠ destination, departure not more than 1 h in the past, weight bounds above, spacing in the allowed set. Out-of-horizon ETAs are reported per checkpoint, not as a hard input error.
-
-## Required outputs
-- Up to three distinct truck routes, with an explicit limitation when fewer exist.
-- Route geometry, distance, duration, ETA, checkpoints, weather values, severity and driving factors, severity mile totals (incl. No Travel and unknown), weighted average risk, eligibility and route summaries.
-- Recommendation by lexicographic order: fewest Severe miles, fewest High miles, lowest average risk, shortest duration, then route ID; with a human-readable reason.
-- Corridor heatmap with 0–48 h slider, clearly separate from ETA-based scoring.
-
-## Weather risk thresholds
-Units: wind mph (sustained 10 m), rain in/hr, snow in/hr (snowfall rate). Convert at the adapter boundary only.
-- Wind: Low <25; Moderate [25,35); High [35,45); Severe [45,55); No Travel ≥55.
-- Rain: Low <0.10; Moderate [0.10,0.25); High [0.25,0.50); Severe [0.50,1.00]; No Travel >1.00.
-- Snow: Low <0.5; Moderate [0.5,1.0); High [1.0,2.0); Severe [2.0,3.0]; No Travel >3.0.
-- The brief's ranges overlap at boundaries; the half-open intervals above are the chosen interpretation (document in README).
-- Load overrides: wind ≥55 → No Travel for all; 45 ≤ wind <55 and load >30,000 lb → No Travel; 35 ≤ wind <45 and load >40,000 lb → at least Severe. Exactly 30,000/40,000 lb do not trigger.
-- Final checkpoint risk = max of wind, rain, snow and load-adjusted severities. Gusts may be displayed, not scored.
-
-## Route sampling and ETA
-- Sample by cumulative distance along the decoded polyline at the chosen spacing, origin and destination included exactly once; interpolate positions on the route.
-- ETA from HERE span durations interpolated by distance; proportional `total_duration × d / total_distance` only as a disclosed fallback (`eta_method`).
-- Each checkpoint owns the interval between midpoints to its neighbours, capped to [0, total]; intervals partition the route. Sum miles per severity — never count checkpoints as miles.
-- Weighted average risk = Σ(known interval miles × severity) / known miles; unknown miles reported separately.
-- Cache weather by rounded coordinate (full hourly series), then select by time, so caching never changes time semantics.
+## Required user inputs and outputs
+- Inputs: origin, destination, departure date/time with IANA timezone (default: browser timezone), cargo weight (lb), checkpoint spacing (10, 25 or 50 mi). Validate: origin ≠ destination, departure from 1 h ago to 14 days ahead, weight bounds, allowed spacing.
+- Outputs: up to three distinct truck routes with geometry, distance, duration, arrival, ETA-based checkpoints (weather, severity, factors), miles per severity (incl. No Travel and Unknown), weighted average risk, eligibility, a lexicographic recommendation (Severe miles, High miles, average risk, duration, route ID) with a human-readable reason, and the corridor heatmap.
 
 ## Implementation discipline
-- Read `.claude/skills/weather-routing/SKILL.md` before changing risk, sampling, ETA, recommendation or heatmap logic.
+- Read `.claude/skills/weather-routing/SKILL.md` before changing risk, sampling, ETA, forecast, recommendation, provider or heatmap logic. It is the single source for thresholds, algorithms and mandatory test cases; do not restate them here.
 - Pure functions for business logic; compare thresholds on exact values (no pre-rounding) and test the listed edge values.
-- HERE critical notices (e.g. `violatedVehicleRestriction`) are surfaced as route warnings, never hidden.
 - Provider calls: timeouts (`PROVIDER_CONNECT_TIMEOUT_S`, `PROVIDER_READ_TIMEOUT_S`), at most `PROVIDER_MAX_RETRIES` retries with backoff on timeouts, connection errors, 5xx and 429-with-short-Retry-After only (never TLS or malformed-URL errors), within a per-call budget (`PROVIDER_CALL_BUDGET_S`); mapped to typed errors and HTTP 502/503/504 with a useful message.
-- Forecast windows are sized with `forecast_hours_needed()` (hour-aligned, as Open-Meteo counts from the current hour); never compute them inline.
+- Shared constants and helpers are defined once and imported (e.g. `forecast_hours_needed()`, `CORRIDOR_MAX_POINTS`, `iso_utc`).
 - Tests never hit the network: use fakes and recorded fixtures.
 - Avoid unnecessary abstractions, dependencies, background jobs and extra features.
 
@@ -118,7 +94,7 @@ Backend (from `backend/`, venv at `backend/.venv`):
 - Types: `.venv/bin/mypy .`
 - Django: `.venv/bin/python manage.py check`
 
-Frontend (from `frontend/`, added in Step 6):
+Frontend (from `frontend/`):
 - `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build`
 
 ## Definition of done
