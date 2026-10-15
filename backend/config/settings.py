@@ -25,6 +25,7 @@ if not SECRET_KEY:
         raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false")
     SECRET_KEY = secrets.token_urlsafe(50)  # ephemeral dev key; nothing is signed or persisted
 
+
 def host_only(value: str) -> str:
     """Accept hosts written as URLs ("https://example.com/") and reduce them to "example.com"."""
     return value.split("://", 1)[-1].split("/", 1)[0]
@@ -102,9 +103,14 @@ GEOCODE_COUNTRY_CODES = os.environ.get("GEOCODE_COUNTRY_CODES", "USA")
 TRUCK_EMPTY_WEIGHT_LB = float(os.environ.get("TRUCK_EMPTY_WEIGHT_LB", "35000"))
 CACHE_TIMEOUT_S = int(os.environ.get("CACHE_TIMEOUT_S", "900"))
 # Heatmap grid cap. Each cell is one forecast location; Open-Meteo's free tier allows 600 per minute.
-HEATMAP_MAX_CELLS = int(os.environ.get("HEATMAP_MAX_CELLS", "200"))
+# HERE weather costs one request per cell, so it gets a smaller default grid than Open-Meteo.
+HEATMAP_MAX_CELLS = int(os.environ.get("HEATMAP_MAX_CELLS", "80" if WEATHER_PROVIDER == "here" else "200"))
 if HEATMAP_MAX_CELLS < 9:
     raise RuntimeError("HEATMAP_MAX_CELLS must be at least 9")
+
+HERE_WEATHER_BASE_URL = os.environ.get("HERE_WEATHER_BASE_URL", "https://weather.hereapi.com/v3")
+# Parallel requests (one location each); requests' default connection pool holds 10 per host.
+HERE_WEATHER_CONCURRENCY = int(os.environ.get("HERE_WEATHER_CONCURRENCY", "10"))
 
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
 OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")

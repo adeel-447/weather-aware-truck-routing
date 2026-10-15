@@ -60,7 +60,7 @@ describe('validateTrip', () => {
   it('rejects departures beyond the forecast range and empty dates', () => {
     expect(
       validateTrip({ ...valid, departureLocal: '2026-11-05T08:00' }, NOW).departureLocal,
-    ).toMatch(/14 days/)
+    ).toMatch(/6 days/)
     expect(validateTrip({ ...valid, departureLocal: '' }, NOW).departureLocal).toMatch(/Enter/)
   })
 })

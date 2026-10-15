@@ -46,6 +46,9 @@ class TruckRouter(Protocol):
 
 
 class Forecaster(Protocol):
+    #: Human-readable source name shown in API responses.
+    description: str
+
     def hourly_forecasts(self, locations: Sequence[LatLon], forecast_hours: int) -> list[HourlyForecast]:
         """One hourly series per location, in input order, starting shortly before the current hour."""
         ...

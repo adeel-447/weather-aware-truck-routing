@@ -27,7 +27,8 @@ export function describeError(error: Error, context: ErrorContext = 'trip'): Err
     case 'provider_rate_limited':
       return {
         title: `${service} is busy`,
-        message: 'The request limit was reached. Wait about a minute, then try again.',
+        // Limits differ (per minute, per day), so pass on the provider's own wording.
+        message: `The request limit was reached: ${detail}.`,
         retryable: true,
       }
     case 'provider_timeout':

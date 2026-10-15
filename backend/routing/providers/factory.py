@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from routing.providers.base import Forecaster, Geocoder, TruckRouter
 from routing.providers.cache import CachedForecaster
 from routing.providers.here import HereGeocoder, HereTruckRouter
+from routing.providers.here_weather import HereWeatherForecaster
 from routing.providers.http import JsonClient
 from routing.providers.open_meteo import OpenMeteoForecaster
 
@@ -46,4 +47,12 @@ def get_forecaster() -> Forecaster:
             _client("Open-Meteo"), settings.OPEN_METEO_BASE_URL, settings.OPEN_METEO_API_KEY
         )
         return CachedForecaster(inner, cache, timeout_s=settings.CACHE_TIMEOUT_S)
+    if settings.WEATHER_PROVIDER == "here":
+        here = HereWeatherForecaster(
+            _client("HERE"),
+            settings.HERE_WEATHER_BASE_URL,
+            settings.HERE_API_KEY,
+            concurrency=settings.HERE_WEATHER_CONCURRENCY,
+        )
+        return CachedForecaster(here, cache, timeout_s=settings.CACHE_TIMEOUT_S)
     raise ImproperlyConfigured(f"unknown WEATHER_PROVIDER {settings.WEATHER_PROVIDER!r}")

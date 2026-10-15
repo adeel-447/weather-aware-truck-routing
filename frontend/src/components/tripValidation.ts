@@ -15,7 +15,8 @@ export type TripFormErrors = Partial<Record<keyof TripFormValues, string>>
 // Mirrors backend limits (routing/serializers.py); the backend remains authoritative.
 export const MAX_LOAD_LB = 80_000
 const PAST_GRACE_MS = 60 * 60 * 1000
-const MAX_AHEAD_MS = 14 * 24 * 60 * 60 * 1000
+// Departure plus the trip must fit in the 7-day weather forecast (backend allows 6 days ahead).
+const MAX_AHEAD_MS = 6 * 24 * 60 * 60 * 1000
 
 export function validateTrip(values: TripFormValues, now: number = Date.now()): TripFormErrors {
   const errors: TripFormErrors = {}
@@ -30,7 +31,7 @@ export function validateTrip(values: TripFormValues, now: number = Date.now()): 
   if (instant === null) errors.departureLocal = 'Enter a departure date and time.'
   else if (instant < now - PAST_GRACE_MS) errors.departureLocal = 'Departure is in the past.'
   else if (instant > now + MAX_AHEAD_MS)
-    errors.departureLocal = 'Departure must be within 14 days (forecast range).'
+    errors.departureLocal = 'Departure must be within 6 days (forecast range).'
 
   const load = Number(values.loadWeightLb)
   if (values.loadWeightLb.trim() === '' || !Number.isFinite(load))

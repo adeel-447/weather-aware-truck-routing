@@ -15,7 +15,8 @@ from routing.services.evaluate import CORRIDOR_MAX_POINTS, Place
 
 MAX_LOAD_LB = 80_000
 DEPARTURE_PAST_GRACE = timedelta(hours=1)
-DEPARTURE_MAX_AHEAD = timedelta(days=14)
+# Departure + a long trip must fit in the shortest provider forecast (HERE: 7 days).
+DEPARTURE_MAX_AHEAD = timedelta(days=6)
 COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 
 
@@ -83,7 +84,7 @@ class EvaluateRequestSerializer(serializers.Serializer[dict[str, Any]]):
             raise serializers.ValidationError({"departure_at": "departure is in the past"})
         if departure > now + DEPARTURE_MAX_AHEAD:
             raise serializers.ValidationError(
-                {"departure_at": "departure must be within 14 days (forecast range)"}
+                {"departure_at": "departure must be within 6 days (forecast range)"}
             )
         origin, destination = attrs["origin"], attrs["destination"]
         if origin == destination:
@@ -116,5 +117,5 @@ class HeatmapRequestSerializer(serializers.Serializer[dict[str, Any]]):
         now = _now()
         # Reference is departure rounded down to the hour, so allow one extra hour of grace.
         if value < now - DEPARTURE_PAST_GRACE - timedelta(hours=1) or value > now + DEPARTURE_MAX_AHEAD:
-            raise serializers.ValidationError("reference time must be between 2 hours ago and 14 days ahead")
+            raise serializers.ValidationError("reference time must be between 2 hours ago and 6 days ahead")
         return value

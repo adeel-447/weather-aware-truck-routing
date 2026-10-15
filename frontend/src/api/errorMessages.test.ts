@@ -64,4 +64,16 @@ describe('describeError', () => {
     expect(describeError(error).title).toBe('Check the trip details')
     expect(describeError(error, 'heatmap').title).toBe('The forecast request was rejected')
   })
+
+  it("passes on the provider's own wording for rate limits", () => {
+    const daily = apiError(
+      503,
+      'provider_rate_limited',
+      'Daily API request limit exceeded. Please try again tomorrow.',
+      'Open-Meteo',
+    )
+    expect(describeError(daily).message).toBe(
+      'The request limit was reached: Daily API request limit exceeded. Please try again tomorrow.',
+    )
+  })
 })

@@ -90,6 +90,8 @@ class FakeRouter:
 
 
 class FakeForecaster:
+    description = "Fake hourly forecast"
+
     def __init__(
         self,
         weather: WeatherFn = calm,

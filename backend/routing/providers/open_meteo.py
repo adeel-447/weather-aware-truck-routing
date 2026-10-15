@@ -26,6 +26,8 @@ EXPECTED_UNITS = {"wind_speed_10m": "mp/h", "rain": "inch", "showers": "inch", "
 
 
 class OpenMeteoForecaster:
+    description = "Open-Meteo hourly forecast"
+
     def __init__(self, client: JsonClient, base_url: str, api_key: str = "") -> None:
         self.client = client
         self.base_url = base_url

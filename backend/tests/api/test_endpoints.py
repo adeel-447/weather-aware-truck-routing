@@ -127,7 +127,7 @@ def test_single_route_from_provider(providers):
         ({"timezone": "Mars/Base"}, "timezone"),
         ({"departure_at": "tomorrow"}, "departure_at"),
         ({"departure_at": "2026-10-20T08:00:00Z".replace("10-20", "10-19")}, "departure_at"),  # past
-        ({"departure_at": "2026-11-20T08:00:00Z"}, "departure_at"),  # beyond 14 days
+        ({"departure_at": "2026-10-27T08:00:00Z"}, "departure_at"),  # beyond 6 days
         ({"destination": "Chicago, IL"}, "destination"),
         ({"origin": "95.0,10.0"}, "origin"),
         ({"origin": ""}, "origin"),
@@ -300,8 +300,22 @@ def test_heatmap_does_not_touch_routing(providers):
 
 def test_heatmap_reference_error_message_matches_rule(providers):
     error = error_of(post(HEATMAP, {**HEATMAP_BODY, "reference_at": "2026-10-19T00:00:00Z"}))
-    assert "between 2 hours ago and 14 days ahead" in str(error["fields"]["reference_at"])
+    assert "between 2 hours ago and 6 days ahead" in str(error["fields"]["reference_at"])
 
 
 def test_forecast_cache_is_sized_for_large_trips(settings):
     assert settings.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"] >= 5000
+
+
+def test_factory_selects_here_weather(settings):
+    from routing.providers.cache import CachedForecaster
+    from routing.providers.factory import get_forecaster
+
+    settings.WEATHER_PROVIDER = "here"
+    forecaster = get_forecaster()
+    assert isinstance(forecaster, CachedForecaster)
+    assert forecaster.description == "HERE Destination Weather hourly forecast"
+
+
+def test_response_names_the_weather_source(providers):
+    assert post(EVALUATE, VALID).json()["provider"]["weather"] == "Fake hourly forecast"

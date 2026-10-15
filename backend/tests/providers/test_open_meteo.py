@@ -107,6 +107,8 @@ def test_forecast_hours_capped_at_provider_maximum(client_factory):
 
 
 class CountingForecaster:
+    description = "Counting forecaster"
+
     def __init__(self):
         self.calls = []
 

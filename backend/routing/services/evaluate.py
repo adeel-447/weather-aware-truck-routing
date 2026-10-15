@@ -33,8 +33,9 @@ UNAVAILABLE = WeatherSample(None, None, None)
 ASSUMPTIONS = (
     "ETAs are driving time from the routing provider; rest, fuel and hours-of-service stops are not modeled.",
     "Weather risk load rules use the entered cargo load; truck routing uses empty truck weight + cargo.",
-    "Wind is sustained 10 m wind speed, interpolated between forecast hours; rain and snow are the "
-    "forecast hour containing the ETA.",
+    "Wind is sustained wind speed, interpolated between forecast hours; rain and snow use the "
+    "forecast hour containing the ETA, or the larger of the two neighbouring hours when the provider "
+    "does not state which hour a value covers.",
     "Checkpoint risk applies to the route stretch between the midpoints to neighbouring checkpoints.",
     "Missing forecast data is Unknown, never Low; routes with Unknown miles are not recommended.",
 )
@@ -243,7 +244,7 @@ def evaluate_trip(
         ),
         "provider": {
             "routing": "HERE Routing API v8 (truck)",
-            "weather": "Open-Meteo hourly forecast",
+            "weather": providers.forecaster.description,
             "routes_requested": requested,
             "routes_returned": len(provider_routes),
             "duplicates_removed": len(provider_routes) - len(routes),

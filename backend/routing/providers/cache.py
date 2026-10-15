@@ -41,6 +41,7 @@ class CachedForecaster:
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.inner = inner
+        self.description = inner.description
         self.cache = cache
         self.timeout_s = timeout_s
         self.now = now
@@ -57,6 +58,7 @@ class CachedForecaster:
         if missing:
             fetched = self.inner.hourly_forecasts(missing, hours)
             fresh = {keys[point]: forecast for point, forecast in zip(missing, fetched, strict=True)}
-            self.cache.set_many(fresh, timeout=self.timeout_s)
+            # Empty series are failed lookups: use them for this request but never cache them.
+            self.cache.set_many({k: f for k, f in fresh.items() if f.times}, timeout=self.timeout_s)
             found.update(fresh)
         return [found[keys[point]] for point in snapped]
