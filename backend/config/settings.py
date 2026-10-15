@@ -25,8 +25,22 @@ if not SECRET_KEY:
         raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false")
     SECRET_KEY = secrets.token_urlsafe(50)  # ephemeral dev key; nothing is signed or persisted
 
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
-CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+def host_only(value: str) -> str:
+    """Accept hosts written as URLs ("https://example.com/") and reduce them to "example.com"."""
+    return value.split("://", 1)[-1].split("/", 1)[0]
+
+
+def origin_only(value: str) -> str:
+    """CORS origins are scheme + host with no path or trailing slash."""
+    return value.rstrip("/")
+
+
+ALLOWED_HOSTS = [host_only(h) for h in env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")]
+# Render sets the service's real host name (it may carry a suffix such as "-ypg8"); trust it.
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+CORS_ALLOWED_ORIGINS = [origin_only(o) for o in env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")]
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
