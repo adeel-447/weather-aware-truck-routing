@@ -69,6 +69,8 @@ def three_routes() -> list[ProviderRoute]:
 
 
 class FakeRouter:
+    description = "Fake truck router"
+
     def __init__(self, routes: list[ProviderRoute] | None = None, error: Exception | None = None):
         self.routes = routes if routes is not None else three_routes()
         self.error = error
@@ -91,6 +93,7 @@ class FakeRouter:
 
 class FakeForecaster:
     description = "Fake hourly forecast"
+    fixed_window = False
 
     def __init__(
         self,

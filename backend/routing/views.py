@@ -12,6 +12,8 @@ from routing.services.heatmap import corridor_heatmap
 
 
 class EvaluateRoutesView(APIView):
+    throttle_scope = "evaluate"
+
     def post(self, request: Request) -> Response:
         serializer = EvaluateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -23,6 +25,7 @@ class EvaluateRoutesView(APIView):
             timezone=data["timezone"],
             load_lb=data["load_weight_lb"],
             spacing_miles=data["checkpoint_spacing_miles"],
+            departure_ambiguous=data["departure_ambiguous"],
         )
         providers = Providers(factory.get_geocoder(), factory.get_router(), factory.get_forecaster())
         result = evaluate_trip(
@@ -30,19 +33,12 @@ class EvaluateRoutesView(APIView):
             providers,
             Settings(empty_truck_lb=settings.TRUCK_EMPTY_WEIGHT_LB, alternatives=settings.ROUTE_ALTERNATIVES),
         )
-        if data["departure_ambiguous"]:
-            result["warnings"].append(
-                {
-                    "code": "ambiguous_local_time",
-                    "message": "Departure local time occurs twice (clocks fall back); the first occurrence "
-                    "was used.",
-                    "route_id": None,
-                }
-            )
         return Response(result)
 
 
 class HeatmapView(APIView):
+    throttle_scope = "heatmap"
+
     def post(self, request: Request) -> Response:
         serializer = HeatmapRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

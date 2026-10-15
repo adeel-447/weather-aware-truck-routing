@@ -60,6 +60,13 @@ export function describeError(error: Error, context: ErrorContext = 'trip'): Err
     case 'invalid_response':
       // The same request returns the same malformed payload.
       return { title: 'Unexpected server response', message: error.message, retryable: false }
+    case 'throttled':
+      return {
+        title: 'Too many requests',
+        // DRF's message includes when the next request is allowed.
+        message: `${detail}. This limit protects the shared weather quota.`,
+        retryable: false,
+      }
     case 'invalid_request':
     case 'place_not_found':
       return context === 'heatmap'

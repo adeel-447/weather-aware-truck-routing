@@ -47,14 +47,22 @@ describe('validateTrip', () => {
   })
 
   it('interprets departure in the selected time zone', () => {
-    // 06:30 Chicago (11:30Z) is within the 1 h grace; 06:30 New York (10:30Z) is not.
-    expect(validateTrip({ ...valid, departureLocal: '2026-10-20T06:30' }, NOW)).toEqual({})
+    // NOW is 12:00Z. 07:00 Chicago is 12:00Z (the current hour); 07:00 New York is 11:00Z (earlier).
+    expect(validateTrip({ ...valid, departureLocal: '2026-10-20T07:00' }, NOW)).toEqual({})
     expect(
       validateTrip(
-        { ...valid, departureLocal: '2026-10-20T06:30', timezone: 'America/New_York' },
+        { ...valid, departureLocal: '2026-10-20T07:00', timezone: 'America/New_York' },
         NOW,
       ).departureLocal,
-    ).toMatch(/past/)
+    ).toMatch(/current hour or later/)
+  })
+
+  it('allows a departure earlier in the current hour but not before it', () => {
+    const tenPast = NOW + 10 * 60 * 1000 // 12:10Z
+    expect(validateTrip({ ...valid, departureLocal: '2026-10-20T07:00' }, tenPast)).toEqual({})
+    expect(
+      validateTrip({ ...valid, departureLocal: '2026-10-20T06:59' }, tenPast).departureLocal,
+    ).toMatch(/current hour or later/)
   })
 
   it('rejects departures beyond the forecast range and empty dates', () => {

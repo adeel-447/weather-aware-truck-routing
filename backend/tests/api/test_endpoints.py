@@ -299,8 +299,42 @@ def test_heatmap_does_not_touch_routing(providers):
 
 
 def test_heatmap_reference_error_message_matches_rule(providers):
-    error = error_of(post(HEATMAP, {**HEATMAP_BODY, "reference_at": "2026-10-19T00:00:00Z"}))
-    assert "between 2 hours ago and 6 days ahead" in str(error["fields"]["reference_at"])
+    error = error_of(post(HEATMAP, {**HEATMAP_BODY, "reference_at": "2026-10-18T06:00:00Z"}))  # 54 h ago
+    assert "between 48 hours ago and 6 days ahead" in str(error["fields"]["reference_at"])
+
+
+def test_heatmap_retry_for_an_evaluation_left_on_screen_is_accepted(providers):
+    # Reference 30 h before "now": the evaluation is old but still on screen; past frames are unavailable.
+    response = post(HEATMAP, {**HEATMAP_BODY, "reference_at": "2026-10-19T06:00:00Z"})
+    assert response.status_code == 200
+
+
+def test_departure_before_the_current_hour_is_rejected(providers, monkeypatch):
+    monkeypatch.setattr(request_serializers, "_now", lambda: datetime(2026, 10, 20, 13, 5, tzinfo=UTC))
+    early = post(EVALUATE, {**VALID, "departure_at": "2026-10-20T12:55:00Z"})
+    assert early.status_code == 400
+    assert "current hour or later" in str(error_of(early)["fields"]["departure_at"])
+    # The start of the current hour is the first forecast hour, so it is accepted.
+    assert post(EVALUATE, {**VALID, "departure_at": "2026-10-20T13:00:00Z"}).status_code == 200
+
+
+def test_response_names_the_routing_source(providers):
+    assert post(EVALUATE, VALID).json()["provider"]["routing"] == "Fake truck router"
+
+
+def test_requests_are_throttled_per_client_with_retry_after(providers, monkeypatch):
+    from django.core.cache import cache
+    from rest_framework.throttling import ScopedRateThrottle
+
+    cache.clear()
+    monkeypatch.setattr(ScopedRateThrottle, "THROTTLE_RATES", {"evaluate": "1/min", "heatmap": "1/min"})
+    assert post(EVALUATE, VALID).status_code == 200
+    throttled = post(EVALUATE, VALID)
+    assert throttled.status_code == 429
+    assert error_of(throttled)["code"] == "throttled"
+    assert int(throttled["Retry-After"]) > 0
+    assert post(HEATMAP, HEATMAP_BODY).status_code == 200  # separate limit per endpoint
+    cache.clear()
 
 
 def test_forecast_cache_is_sized_for_large_trips(settings):

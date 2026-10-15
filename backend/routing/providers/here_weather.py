@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import UTC, datetime
 from typing import Any
 
 from routing.domain.forecast import HourlyForecast
 from routing.domain.geometry import LatLon
-from routing.providers.errors import ProviderConfigError, ProviderError
+from routing.providers.errors import ProviderConfigError, ProviderError, ProviderTimeout
 from routing.providers.http import JsonClient
 
 logger = logging.getLogger(__name__)
@@ -34,12 +34,22 @@ EMPTY = HourlyForecast(times=(), wind_mph=(), rain_in_hr=(), snow_in_hr=())
 
 class HereWeatherForecaster:
     description = "HERE Destination Weather hourly forecast"
+    fixed_window = True  # always the full 168-hour series
 
-    def __init__(self, client: JsonClient, base_url: str, api_key: str, concurrency: int) -> None:
+    def __init__(
+        self,
+        client: JsonClient,
+        base_url: str,
+        api_key: str,
+        concurrency: int,
+        deadline_s: float = 60.0,
+    ) -> None:
         self.client = client
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.concurrency = max(1, concurrency)
+        # Overall limit for one batch; each call also has the HTTP client's own budget.
+        self.deadline_s = deadline_s
 
     def hourly_forecasts(self, locations: Sequence[LatLon], forecast_hours: int) -> list[HourlyForecast]:
         """``forecast_hours`` is ignored: HERE always returns its full 168-hour series."""
@@ -47,8 +57,18 @@ class HereWeatherForecaster:
             raise ProviderConfigError(PROVIDER, "HERE_API_KEY is not configured")
         if not locations:
             return []
-        with ThreadPoolExecutor(max_workers=min(self.concurrency, len(locations))) as pool:
-            outcomes = list(pool.map(self._fetch, locations))
+        pool = ThreadPoolExecutor(max_workers=min(self.concurrency, len(locations)))
+        futures: list[Future[HourlyForecast | ProviderError]] = [
+            pool.submit(self._fetch, location) for location in locations
+        ]
+        wait(futures, timeout=self.deadline_s)
+        # Do not wait for stragglers: queued lookups are cancelled, running ones end within their own
+        # HTTP budget in the background.
+        pool.shutdown(wait=False, cancel_futures=True)
+        late = ProviderTimeout(PROVIDER, f"weather lookups exceeded {self.deadline_s:.0f} s")
+        outcomes = [
+            future.result() if future.done() and not future.cancelled() else late for future in futures
+        ]
 
         failures = [outcome for outcome in outcomes if isinstance(outcome, ProviderError)]
         if len(failures) == len(outcomes):

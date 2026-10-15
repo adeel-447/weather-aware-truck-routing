@@ -14,7 +14,9 @@ from routing.domain.sampling import ALLOWED_SPACINGS_MILES
 from routing.services.evaluate import CORRIDOR_MAX_POINTS, Place
 
 MAX_LOAD_LB = 80_000
-DEPARTURE_PAST_GRACE = timedelta(hours=1)
+# Heatmap requests may come from an evaluation left on screen; frames before the current hour simply
+# come back unavailable.
+HEATMAP_REFERENCE_MAX_AGE = timedelta(hours=48)
 # Departure + a long trip must fit in the shortest provider forecast (HERE: 7 days).
 DEPARTURE_MAX_AHEAD = timedelta(days=6)
 COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
@@ -22,6 +24,12 @@ COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _current_hour(now: datetime) -> datetime:
+    """Start of the current UTC hour: the first hour every weather provider can forecast (HERE's
+    series starts here), so an earlier departure would leave the first checkpoints Unknown."""
+    return now.replace(minute=0, second=0, microsecond=0)
 
 
 def parse_place(value: str) -> Place:
@@ -80,8 +88,10 @@ class EvaluateRequestSerializer(serializers.Serializer[dict[str, Any]]):
         except serializers.ValidationError as exc:
             raise serializers.ValidationError({"departure_at": exc.detail}) from exc
         now = _now()
-        if departure < now - DEPARTURE_PAST_GRACE:
-            raise serializers.ValidationError({"departure_at": "departure is in the past"})
+        if departure < _current_hour(now):
+            raise serializers.ValidationError(
+                {"departure_at": "departure must be in the current hour or later"}
+            )
         if departure > now + DEPARTURE_MAX_AHEAD:
             raise serializers.ValidationError(
                 {"departure_at": "departure must be within 6 days (forecast range)"}
@@ -115,7 +125,6 @@ class HeatmapRequestSerializer(serializers.Serializer[dict[str, Any]]):
 
     def validate_reference_at(self, value: datetime) -> datetime:
         now = _now()
-        # Reference is departure rounded down to the hour, so allow one extra hour of grace.
-        if value < now - DEPARTURE_PAST_GRACE - timedelta(hours=1) or value > now + DEPARTURE_MAX_AHEAD:
-            raise serializers.ValidationError("reference time must be between 2 hours ago and 6 days ahead")
+        if value < now - HEATMAP_REFERENCE_MAX_AGE or value > now + DEPARTURE_MAX_AHEAD:
+            raise serializers.ValidationError("reference time must be between 48 hours ago and 6 days ahead")
         return value

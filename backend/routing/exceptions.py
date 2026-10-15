@@ -40,6 +40,9 @@ def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response |
             if isinstance(response.data, dict)
             else "Request failed."
         )
-        return error_response(response.status_code, getattr(exc, "default_code", "error"), str(detail))
+        result = error_response(response.status_code, getattr(exc, "default_code", "error"), str(detail))
+        if "Retry-After" in response:  # e.g. throttling: tell clients when to retry
+            result["Retry-After"] = response["Retry-After"]
+        return result
     logger.exception("unhandled error")
     return error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error", "Unexpected server error.")

@@ -76,4 +76,16 @@ describe('describeError', () => {
       'The request limit was reached: Daily API request limit exceeded. Please try again tomorrow.',
     )
   })
+
+  it('explains throttling without offering an immediate retry', () => {
+    const throttled = apiError(
+      429,
+      'throttled',
+      'Request was throttled. Expected available in 42 seconds.',
+    )
+    const description = describeError(throttled)
+    expect(description.title).toBe('Too many requests')
+    expect(description.message).toContain('Expected available in 42 seconds')
+    expect(description.retryable).toBe(false)
+  })
 })

@@ -9,17 +9,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from routing.domain.forecast import forecast_hours_needed, weather_at
 from routing.domain.geometry import LatLon
 from routing.domain.heatmap_grid import MAX_CELLS, corridor_grid
 from routing.domain.risk import assess
 from routing.providers.base import Forecaster
+from routing.services.payloads import HeatmapFramePayload, HeatmapPayload, UnitsPayload
 from routing.services.serialization import iso_utc, round_or_none
 
 MAX_OFFSET_HOURS = 48
-UNITS = {"wind_mph": "mph", "rain_in_hr": "in/hr", "snow_in_hr": "in/hr"}
+UNITS: UnitsPayload = {"wind_mph": "mph", "rain_in_hr": "in/hr", "snow_in_hr": "in/hr"}
 NOTE = (
     "Forecast conditions across the corridor at the selected valid time, using the same risk rules and "
     "cargo load as route scoring. This is not the weather at each checkpoint's ETA and does not affect "
@@ -34,14 +34,14 @@ def corridor_heatmap(
     forecaster: Forecaster,
     now: datetime | None = None,
     max_cells: int = MAX_CELLS,
-) -> dict[str, Any]:
+) -> HeatmapPayload:
     now = now or datetime.now(UTC)
     reference = reference_at.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
     grid = corridor_grid(corridor, max_cells=max_cells)
     last_valid = reference + timedelta(hours=MAX_OFFSET_HOURS)
     series = forecaster.hourly_forecasts(list(grid.centers), forecast_hours_needed(last_valid, now))
 
-    frames = []
+    frames: list[HeatmapFramePayload] = []
     for offset in range(MAX_OFFSET_HOURS + 1):
         valid_at = reference + timedelta(hours=offset)
         samples = [weather_at(forecast, valid_at) for forecast in series]

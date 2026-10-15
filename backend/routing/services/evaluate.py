@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 
 from routing.domain.checkpoints import build_checkpoints, sample_positions
 from routing.domain.eta import TimingCurve, arrival_at
@@ -21,6 +20,14 @@ from routing.domain.types import Checkpoint, Severity, SeveritySummary, WeatherS
 from routing.domain.units import gross_weight_kg
 from routing.providers.base import Forecaster, GeocodedPlace, Geocoder, ProviderRoute, TruckRouter
 from routing.providers.errors import PlaceNotFound, ProviderError
+from routing.services.payloads import (
+    CheckpointPayload,
+    EvaluatePayload,
+    PlacePayload,
+    RoutePayload,
+    SeverityMilesPayload,
+    WarningPayload,
+)
 from routing.services.serialization import iso_utc, round_or_none
 
 logger = logging.getLogger(__name__)
@@ -55,6 +62,8 @@ class TripRequest:
     timezone: str
     load_lb: float
     spacing_miles: int
+    # The local departure time occurred twice (clocks fell back); the first occurrence was used.
+    departure_ambiguous: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +144,7 @@ def _corridor(routes: list[ProviderRoute]) -> list[LatLon]:
 
 def evaluate_trip(
     trip: TripRequest, providers: Providers, settings: Settings, now: datetime | None = None
-) -> dict[str, Any]:
+) -> EvaluatePayload:
     now = now or datetime.now(UTC)
     origin = _resolve(trip.origin, providers.geocoder, "origin")
     destination = _resolve(trip.destination, providers.geocoder, "destination")
@@ -154,7 +163,7 @@ def evaluate_trip(
         settings.alternatives,
     )
     routes = _dedupe(provider_routes)
-    warnings: list[dict[str, Any]] = []
+    warnings: list[WarningPayload] = []
     requested = settings.alternatives + 1
     if len(routes) < requested:
         warnings.append(
@@ -162,6 +171,13 @@ def evaluate_trip(
                 "fewer_routes_than_requested",
                 f"The routing provider returned {len(routes)} distinct truck route(s) of {requested} "
                 "requested. No alternatives were invented.",
+            )
+        )
+    if trip.departure_ambiguous:
+        warnings.append(
+            _warning(
+                "ambiguous_local_time",
+                "Departure local time occurs twice (clocks fall back); the first occurrence was used.",
             )
         )
     if routing_weight_lb > LEGAL_GROSS_LIMIT_LB:
@@ -243,7 +259,7 @@ def evaluate_trip(
             trip.departure.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
         ),
         "provider": {
-            "routing": "HERE Routing API v8 (truck)",
+            "routing": providers.router.description,
             "weather": providers.forecaster.description,
             "routes_requested": requested,
             "routes_returned": len(provider_routes),
@@ -254,15 +270,15 @@ def evaluate_trip(
     }
 
 
-def _warning(code: str, message: str, route_id: str | None = None) -> dict[str, Any]:
+def _warning(code: str, message: str, route_id: str | None = None) -> WarningPayload:
     return {"code": code, "message": message, "route_id": route_id}
 
 
 def _route_warnings(
     route: ProviderRoute, timing: TimingCurve, summary: SeveritySummary, weather_ok: bool
-) -> list[dict[str, Any]]:
+) -> list[WarningPayload]:
     rid = route.route_id
-    warnings = []
+    warnings: list[WarningPayload] = []
     if summary.has_no_travel:
         warnings.append(
             _warning(
@@ -293,11 +309,11 @@ def _route_warnings(
     return warnings
 
 
-def _place_payload(place: GeocodedPlace) -> dict[str, Any]:
+def _place_payload(place: GeocodedPlace) -> PlacePayload:
     return {"label": place.label, "lat": place.lat, "lon": place.lon}
 
 
-def _checkpoint_payload(index: int, checkpoint: Checkpoint) -> dict[str, Any]:
+def _checkpoint_payload(index: int, checkpoint: Checkpoint) -> CheckpointPayload:
     severity = checkpoint.risk.severity
     weather = checkpoint.weather
     return {
@@ -326,9 +342,16 @@ def _route_payload(
     summary: SeveritySummary,
     departure: datetime,
     ranked: RankedRoute,
-) -> dict[str, Any]:
-    severity_miles = {s.label: round(m, 2) for s, m in summary.miles.items()}
-    severity_miles["unknown"] = round(summary.unknown_miles, 2)
+) -> RoutePayload:
+    miles = summary.miles
+    severity_miles: SeverityMilesPayload = {
+        "low": round(miles[Severity.LOW], 2),
+        "moderate": round(miles[Severity.MODERATE], 2),
+        "high": round(miles[Severity.HIGH], 2),
+        "severe": round(miles[Severity.SEVERE], 2),
+        "no_travel": round(miles[Severity.NO_TRAVEL], 2),
+        "unknown": round(summary.unknown_miles, 2),
+    }
     return {
         "id": route.route_id,
         "rank": ranked.rank,

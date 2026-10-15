@@ -35,4 +35,33 @@ describe('response guards', () => {
     heatmap.frames[3]!.severity.pop()
     expect(isHeatmapResponse(heatmap)).toBe(false)
   })
+
+  it('rejects values the UI indexes into when they are unknown or missing', () => {
+    const badSeverity = evaluationFixture()
+    ;(badSeverity.routes[0]!.checkpoints[0] as unknown as Record<string, unknown>)['severity'] =
+      'extreme'
+    expect(isEvaluateResponse(badSeverity)).toBe(false)
+
+    const noFactors = evaluationFixture()
+    delete (noFactors.routes[0]!.checkpoints[0] as unknown as Record<string, unknown>)['factors']
+    expect(isEvaluateResponse(noFactors)).toBe(false)
+
+    const badStanding = evaluationFixture()
+    ;(badStanding.routes[0] as unknown as Record<string, unknown>)['standing'] = 'maybe'
+    expect(isEvaluateResponse(badStanding)).toBe(false)
+
+    const badWeather = evaluationFixture()
+    ;(badWeather.routes[0]!.checkpoints[0]!.weather as unknown as Record<string, unknown>)[
+      'wind_mph'
+    ] = '12'
+    expect(isEvaluateResponse(badWeather)).toBe(false)
+
+    const badStatus = evaluationFixture()
+    ;(badStatus.recommendation as unknown as Record<string, unknown>)['status'] = 'probably_fine'
+    expect(isEvaluateResponse(badStatus)).toBe(false)
+
+    const badWarning = evaluationFixture()
+    badWarning.warnings.push({ code: 'x' } as never)
+    expect(isEvaluateResponse(badWarning)).toBe(false)
+  })
 })

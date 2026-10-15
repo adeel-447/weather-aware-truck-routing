@@ -247,3 +247,17 @@ def test_corridor_is_capped_without_dropping_any_route_destination():
     assert len(corridor) <= 2000
     destination = [round(ROCKFORD[1], 5), round(ROCKFORD[0], 5)]
     assert corridor.count(destination) == 3  # every route still ends at the destination
+
+
+def test_ambiguous_departure_warning_comes_from_the_service():
+    request = TripRequest(
+        Place("Chicago, IL", None),
+        Place("Rockford, IL", None),
+        DEPARTURE,
+        "America/Chicago",
+        20_000,
+        10,
+        departure_ambiguous=True,
+    )
+    result = run(request=request)
+    assert [w["code"] for w in result["warnings"]].count("ambiguous_local_time") == 1

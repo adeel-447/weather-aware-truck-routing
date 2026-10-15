@@ -139,3 +139,59 @@ def test_failed_lookups_are_not_cached(client_factory):
     assert len(cached.hourly_forecasts([(41.0, -90.0)], 50)[0].times) == 72  # retried, not cached
     assert cached.description == "HERE Destination Weather hourly forecast"
     cache.clear()
+
+
+@responses.activate
+def test_overall_deadline_turns_slow_locations_unknown(client_factory):
+    import time
+
+    def reply(request):
+        lat = parse_qs(urlparse(request.url).query)["location"][0].split(",")[0]
+        if lat == "40.0000":
+            time.sleep(0.5)  # longer than the batch deadline
+        return 200, {}, json.dumps(RECORDED)
+
+    responses.add_callback(responses.GET, URL, callback=reply)
+    slow = HereWeatherForecaster(client_factory("HERE"), "https://weather.test/v3", "k", 4, deadline_s=0.2)
+    started = time.monotonic()
+    fast, late = slow.hourly_forecasts([(41.0, -90.0), (40.0, -90.0)], 50)
+    assert time.monotonic() - started < 0.45  # returned at the deadline, not after the slow call
+    assert len(fast.times) == 72
+    assert late.times == ()  # Unknown, never Low
+
+
+@responses.activate
+def test_deadline_with_nothing_finished_is_a_timeout(client_factory):
+    import time
+
+    from routing.providers.errors import ProviderTimeout
+
+    def reply(request):
+        time.sleep(0.4)
+        return 200, {}, json.dumps(RECORDED)
+
+    responses.add_callback(responses.GET, URL, callback=reply)
+    slow = HereWeatherForecaster(client_factory("HERE"), "https://weather.test/v3", "k", 4, deadline_s=0.1)
+    with pytest.raises(ProviderTimeout):
+        slow.hourly_forecasts([(41.0, -90.0), (40.0, -90.0)], 50)
+
+
+def test_fixed_window_provider_shares_cache_entries_across_horizons(client_factory):
+    cache = caches["default"]
+    cache.clear()
+    calls = []
+
+    class Fixed:
+        description = "fixed"
+        fixed_window = True
+
+        def hourly_forecasts(self, locations, forecast_hours):
+            calls.append(forecast_hours)
+            return [parse_hourly(RECORDED) for _ in locations]
+
+    now = datetime(2026, 10, 15, 12, tzinfo=UTC)
+    cached = CachedForecaster(Fixed(), cache, timeout_s=60, now=lambda: now)
+    cached.hourly_forecasts([(41.0, -90.0)], 130)  # route evaluation (bucket 168)
+    cached.hourly_forecasts([(41.0, -90.0)], 200)  # heatmap (bucket 384)
+    assert len(calls) == 1
+    cache.clear()

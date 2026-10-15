@@ -42,6 +42,7 @@ class CachedForecaster:
     ) -> None:
         self.inner = inner
         self.description = inner.description
+        self.fixed_window = inner.fixed_window
         self.cache = cache
         self.timeout_s = timeout_s
         self.now = now
@@ -49,9 +50,12 @@ class CachedForecaster:
     def hourly_forecasts(self, locations: Sequence[LatLon], forecast_hours: int) -> list[HourlyForecast]:
         hours = hours_bucket(forecast_hours)
         hour_key = self.now().strftime("%Y%m%d%H")
+        # A fixed-window provider returns the same series whatever the horizon, so one entry serves
+        # both route evaluation and the heatmap.
+        window = "fixed" if self.fixed_window else str(hours)
         snapped = [snap(location) for location in locations]
         unique = list(dict.fromkeys(snapped))
-        keys = {point: f"forecast:{hour_key}:{hours}:{point[0]}:{point[1]}" for point in unique}
+        keys = {point: f"forecast:{hour_key}:{window}:{point[0]}:{point[1]}" for point in unique}
 
         found: dict[str, HourlyForecast] = self.cache.get_many(list(keys.values()))
         missing = [point for point in unique if keys[point] not in found]

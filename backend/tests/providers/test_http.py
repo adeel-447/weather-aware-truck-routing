@@ -121,3 +121,17 @@ def test_call_budget_stops_retries(sleeps):
     with pytest.raises(ProviderTimeout):
         client.get(URL, {})
     assert len(responses.calls) == 1  # 9 s + 0.5 s backoff + 13 s timeouts would exceed 20 s
+
+
+def test_each_thread_gets_its_own_session(client_factory):
+    import threading
+
+    client = client_factory()
+    sessions = []
+    threads = [threading.Thread(target=lambda: sessions.append(client.session)) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len({id(session) for session in sessions}) == 3
+    assert client.session is client.session  # stable within a thread

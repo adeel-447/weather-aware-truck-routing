@@ -35,6 +35,9 @@ class Geocoder(Protocol):
 
 
 class TruckRouter(Protocol):
+    #: Human-readable source name shown in API responses.
+    description: str
+
     def truck_routes(
         self,
         origin: LatLon,
@@ -48,6 +51,8 @@ class TruckRouter(Protocol):
 class Forecaster(Protocol):
     #: Human-readable source name shown in API responses.
     description: str
+    #: True when the provider always returns the same window regardless of ``forecast_hours``.
+    fixed_window: bool
 
     def hourly_forecasts(self, locations: Sequence[LatLon], forecast_hours: int) -> list[HourlyForecast]:
         """One hourly series per location, in input order, starting shortly before the current hour."""

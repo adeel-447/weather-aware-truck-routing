@@ -52,6 +52,8 @@ class HereGeocoder:
 
 
 class HereTruckRouter:
+    description = "HERE Routing API v8 (truck)"
+
     def __init__(self, client: JsonClient, base_url: str, api_key: str) -> None:
         self.client = client
         self.base_url = base_url.rstrip("/")

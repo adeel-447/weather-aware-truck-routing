@@ -81,6 +81,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [],
     "UNAUTHENTICATED_USER": None,
     "EXCEPTION_HANDLER": "routing.exceptions.api_exception_handler",
+    # The endpoints are public and every call spends provider quota (HERE weather: one request per
+    # location), so each client gets a per-endpoint rate limit. Counters live in the cache, i.e. per
+    # gunicorn worker with LocMemCache: an approximate limit, not an exact one.
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "evaluate": os.environ.get("THROTTLE_EVALUATE", "30/hour"),
+        "heatmap": os.environ.get("THROTTLE_HEATMAP", "60/hour"),
+    },
+    # Proxies in front of the app (Render: 1). Unset = use the whole X-Forwarded-For value.
+    "NUM_PROXIES": int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None,
 }
 
 USE_TZ = True
@@ -109,8 +119,10 @@ if HEATMAP_MAX_CELLS < 9:
     raise RuntimeError("HEATMAP_MAX_CELLS must be at least 9")
 
 HERE_WEATHER_BASE_URL = os.environ.get("HERE_WEATHER_BASE_URL", "https://weather.hereapi.com/v3")
-# Parallel requests (one location each); requests' default connection pool holds 10 per host.
-HERE_WEATHER_CONCURRENCY = int(os.environ.get("HERE_WEATHER_CONCURRENCY", "10"))
+# Parallel requests, one location each (every worker thread has its own HTTP session).
+HERE_WEATHER_CONCURRENCY = int(os.environ.get("HERE_WEATHER_CONCURRENCY", "12"))
+# Overall limit for one batch of weather lookups; unfinished locations become Unknown.
+HERE_WEATHER_DEADLINE_S = float(os.environ.get("HERE_WEATHER_DEADLINE_S", "60"))
 
 OPEN_METEO_BASE_URL = os.environ.get("OPEN_METEO_BASE_URL", "https://api.open-meteo.com/v1/forecast")
 OPEN_METEO_API_KEY = os.environ.get("OPEN_METEO_API_KEY", "")

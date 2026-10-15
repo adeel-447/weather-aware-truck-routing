@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -47,9 +48,22 @@ class JsonClient:
         self.timeout = (connect_timeout_s, read_timeout_s)
         self.max_retries = max_retries
         self.budget_s = budget_s
-        self.session = session or requests.Session()
+        # requests.Session is not documented as thread-safe, and adapters fetch in parallel, so each
+        # thread gets its own session (and connection pool). An injected session is used as-is.
+        self._shared_session = session
+        self._local = threading.local()
         self._sleep = sleep
         self._clock = clock
+
+    @property
+    def session(self) -> requests.Session:
+        if self._shared_session is not None:
+            return self._shared_session
+        session: requests.Session | None = getattr(self._local, "session", None)
+        if session is None:
+            session = requests.Session()
+            self._local.session = session
+        return session
 
     def get(self, url: str, params: dict[str, str | int]) -> Any:
         started = float(self._clock())

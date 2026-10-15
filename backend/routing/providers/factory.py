@@ -53,6 +53,7 @@ def get_forecaster() -> Forecaster:
             settings.HERE_WEATHER_BASE_URL,
             settings.HERE_API_KEY,
             concurrency=settings.HERE_WEATHER_CONCURRENCY,
+            deadline_s=settings.HERE_WEATHER_DEADLINE_S,
         )
         return CachedForecaster(here, cache, timeout_s=settings.CACHE_TIMEOUT_S)
     raise ImproperlyConfigured(f"unknown WEATHER_PROVIDER {settings.WEATHER_PROVIDER!r}")

@@ -27,6 +27,7 @@ EXPECTED_UNITS = {"wind_speed_10m": "mp/h", "rain": "inch", "showers": "inch", "
 
 class OpenMeteoForecaster:
     description = "Open-Meteo hourly forecast"
+    fixed_window = False  # the window is sized per request with forecast_hours
 
     def __init__(self, client: JsonClient, base_url: str, api_key: str = "") -> None:
         self.client = client
