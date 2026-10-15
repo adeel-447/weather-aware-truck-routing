@@ -76,13 +76,13 @@ npm run dev                     # http://localhost:5173, proxies /api to Django 
 ## Tests and checks
 ```bash
 cd backend
-.venv/bin/pytest                                   # 216 tests
+.venv/bin/pytest                                   # 225 tests
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy .                                   # strict
 .venv/bin/python manage.py check
 
 cd ../frontend
-npm test                                           # 99 tests (Vitest + Testing Library; MapLibre mocked)
+npm test                                           # 102 tests (Vitest + Testing Library; MapLibre mocked)
 npm run typecheck && npm run lint && npm run format:check
 npm run build
 ```
@@ -121,7 +121,7 @@ All errors use one envelope: `{"error": {"code", "message", "fields"?, "provider
  "timezone": "America/Chicago", "load_weight_lb": 38000, "checkpoint_spacing_miles": 25}
 ```
 - `origin`/`destination`: place text (geocoded) or `"lat,lon"`.
-- `departure_at`: ISO-8601. With an offset it is used as-is; without one it is local time in `timezone`. Local times skipped by DST are rejected; repeated ones use the first occurrence and add an `ambiguous_local_time` warning. Must be from 1 h ago to 6 days ahead, so the whole trip fits inside the 7-day forecast.
+- `departure_at`: ISO-8601. With an offset it is used as-is; without one it is local time in `timezone`. Local times skipped by DST are rejected; repeated ones use the first occurrence and add an `ambiguous_local_time` warning. Must be from the start of the current hour (where the forecast begins) to 6 days ahead, so the whole trip fits inside the 7-day forecast.
 - `load_weight_lb`: cargo, 1–80,000. `checkpoint_spacing_miles`: 10, 25 or 50.
 - Response: `recommendation` (`recommended` | `no_safe_route` | `insufficient_data`, route id, reason), `routes[]` ordered by rank (GeoJSON geometry, distance, duration, arrival, `eta_method`, `severity_miles` incl. `no_travel` and `unknown`, weighted average risk, eligibility, checkpoints with ETA, weather, severity and factors), `warnings[]`, `corridor` and `heatmap_reference_at` for the heatmap call, provider metadata and assumptions.
 - Warning codes: `fewer_routes_than_requested`, `no_travel`, `partial_forecast`, `weather_unavailable`, `eta_approximated`, `provider_notice`, `gross_weight_over_legal_limit`, `ambiguous_local_time`.
@@ -133,13 +133,15 @@ All errors use one envelope: `{"error": {"code", "message", "fields"?, "provider
 ```
 - Returns ≤ `HEATMAP_MAX_CELLS` grid cells and 49 hourly frames (offsets 0–48 h from `reference_at`), each with composite severity (0–4 or null = unavailable) and raw wind/rain/snow per cell. Gzip-compressed.
 
-Error statuses: 400 invalid request; 422 place/route not found or provider rejected the request; 503 provider unavailable, rate-limited or not configured; 504 provider timeout.
+Error statuses: 400 invalid request; 422 place/route not found or provider rejected the request; 503 provider unavailable, rate-limited or not configured; 504 provider timeout; 429 too many requests from this client (`Retry-After` set).
+
+Both endpoints are rate-limited per client because every call spends provider quota: `THROTTLE_EVALUATE` (default 30/hour) and `THROTTLE_HEATMAP` (60/hour). The heatmap accepts a `reference_at` up to 48 h old, so retrying for an evaluation left on screen still works (past hours come back unavailable).
 
 ## Providers
 - **Routing:** HERE Routing API v8, truck mode, with up to 2 alternatives (≤ 3 routes). HERE does not guarantee alternatives; fewer routes are shown with a warning, never padded. Critical HERE notices (e.g. a road forbidden for the vehicle profile) are shown as route warnings.
 - **Geocoding:** HERE Geocoding & Search v7, limited to the USA by default (`GEOCODE_COUNTRY_CODES`).
 - **Weather** (`WEATHER_PROVIDER`):
-  - **`here` (production):** HERE Destination Weather v3 hourly forecast with the same `HERE_API_KEY`. 168 hours from the current hour, wind in mph and rain/snow in inches. One location per request, fetched 10 at a time (`HERE_WEATHER_CONCURRENCY`); the heatmap defaults to 80 cells on this provider. HERE does not document whether an hourly rain/snow value covers the hour before or after its timestamp, so the app uses the larger of the two neighbouring hours: risk can be overstated, never understated. A location that fails is Unknown; if every location fails, the request reports the provider error.
+  - **`here` (production):** HERE Destination Weather v3 hourly forecast with the same `HERE_API_KEY`. 168 hours from the current hour, wind in mph and rain/snow in inches. One location per request, fetched 12 at a time (`HERE_WEATHER_CONCURRENCY`, one HTTP session per worker thread) within an overall `HERE_WEATHER_DEADLINE_S` (60 s; locations not done by then are Unknown); the heatmap defaults to 80 cells on this provider. HERE does not document whether an hourly rain/snow value covers the hour before or after its timestamp, so the app uses the larger of the two neighbouring hours: risk can be overstated, never understated. A location that fails is Unknown; if every location fails, the request reports the provider error.
   - **`open-meteo`:** Open-Meteo hourly forecast, keyless for non-commercial use, up to 384 h ahead. Its free tier is counted per IP address and is exhausted on shared hosting IPs such as Render's, which is why production uses HERE.
 - Forecasts are cached per ~5 km grid cell for `CACHE_TIMEOUT_S` (15 min), so repeat views are fast and use no quota. Failed lookups are never cached.
 - Provider calls have timeouts, at most 2 retries (timeouts, connection errors, 5xx, rate limits with a short Retry-After) and a 20 s budget per call. TLS and URL errors fail fast. Without `HERE_API_KEY`, requests return a clear 503 "not configured" error.

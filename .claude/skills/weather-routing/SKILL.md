@@ -39,11 +39,11 @@ Combination and missing data:
 Two adapters behind `WEATHER_PROVIDER`; both return `HourlyForecast` series in UTC.
 
 HERE Destination Weather v3 (`here`, production; verified in the OpenAPI spec and a recorded response):
-- `GET /v3/report?products=forecastHourly&location={lat},{lng}&units=imperial`; one location per request, fetched in parallel (`HERE_WEATHER_CONCURRENCY`, ≤ the HTTP pool size of 10).
+- `GET /v3/report?products=forecastHourly&location={lat},{lng}&units=imperial`; one location per request, fetched in parallel (`HERE_WEATHER_CONCURRENCY`, one HTTP session per thread) within an overall `HERE_WEATHER_DEADLINE_S`; late locations are Unknown, and none finished → `ProviderTimeout`.
 - Response `places[0].hourlyForecasts[0].forecasts[]`: 168 consecutive hours from the current hour; `time` is local ISO-8601 with offset → convert to UTC.
 - `windSpeed` mph (interpolated like any instantaneous value); `rainFall`, `snowFall` inches. The hour a precipitation value covers is undocumented, so each bucket = max(previous hour, this hour).
-- One failed location → empty series (Unknown, never cached); all failed → raise the provider error.
-- Horizon 7 days, hence departures are limited to 6 days ahead. Each location is one request against the HERE quota; heatmap defaults to 80 cells.
+- One failed location → empty series (Unknown, never cached); all failed → raise the provider error. The series covers a fixed window, so the cache key ignores the hour bucket.
+- Horizon 7 days from the current hour, hence departures run from the start of the current hour to 6 days ahead. Each location is one request against the HERE quota; heatmap defaults to 80 cells.
 
 Open-Meteo (`open-meteo`, verified in docs and a recorded response):
 - Request: `wind_speed_unit=mph`, `precipitation_unit=inch` (applies to snowfall too), `timezone=GMT`, `timeformat=unixtime`, `past_hours=2`, comma-separated multi-location (≤100 per request; a single location returns an object, several return a list). Validate `hourly_units` on every response.

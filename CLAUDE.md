@@ -50,7 +50,7 @@ Business logic belongs in `backend/routing/domain/`. Views and providers stay th
 - **ETA scope.** Driving time from the routing provider only; hours-of-service, fuel and rest stops are not modeled. Say so in README and UI.
 
 ## Required user inputs and outputs
-- Inputs: origin, destination, departure date/time with IANA timezone (default: browser timezone), cargo weight (lb), checkpoint spacing (10, 25 or 50 mi). Validate: origin ≠ destination, departure from 1 h ago to 6 days ahead (HERE forecasts 7 days), weight bounds, allowed spacing.
+- Inputs: origin, destination, departure date/time with IANA timezone (default: browser timezone), cargo weight (lb), checkpoint spacing (10, 25 or 50 mi). Validate: origin ≠ destination, departure from the start of the current hour (where the forecast begins) to 6 days ahead (HERE forecasts 7 days), weight bounds, allowed spacing.
 - Outputs: up to three distinct truck routes with geometry, distance, duration, arrival, ETA-based checkpoints (weather, severity, factors), miles per severity (incl. No Travel and Unknown), weighted average risk, eligibility, a lexicographic recommendation (Severe miles, High miles, average risk, duration, route ID) with a human-readable reason, and the corridor heatmap.
 
 ## Implementation discipline
@@ -67,7 +67,7 @@ Strict typing is mandatory for all code, new and changed; never loosen a setting
 - No `any`, no non-null `!` and no type assertions (`as T`) in app code; `as const` is fine. Narrow `unknown` with type guards instead. ESLint enforces this; tests may assert fixture shapes.
 - Data from outside the app (API responses, map feature properties, JSON) is `unknown` until a guard checks it: `src/api/guards.ts` for responses, `src/map/featureProps.ts` for map features.
 - Optional props accept `undefined` explicitly (`prop?: T | undefined`) when callers may pass it; switches over unions are exhaustive.
-- **Python**: `mypy --strict` (Django and DRF plugins), typed dataclasses at service boundaries, no untyped defs outside tests, no `# type: ignore` without a reason in the same line.
+- **Python**: `mypy --strict` (Django and DRF plugins), typed dataclasses for service inputs and `TypedDict` response payloads (`routing/services/payloads.py`, mirroring `frontend/src/types/api.ts`), no untyped defs outside tests, no `# type: ignore` without a reason in the same line.
 
 ## Development workflow & quality gates
 Work through the approved plan one step at a time:
