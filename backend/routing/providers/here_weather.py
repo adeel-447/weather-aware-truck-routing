@@ -50,6 +50,9 @@ class HereWeatherForecaster:
         self.concurrency = max(1, concurrency)
         # Overall limit for one batch; each call also has the HTTP client's own budget.
         self.deadline_s = deadline_s
+        # Long-lived pool: its threads keep their HTTP sessions (and TLS connections) between
+        # requests, which matters on small instances where each new handshake is slow.
+        self._pool = ThreadPoolExecutor(max_workers=self.concurrency, thread_name_prefix="here-weather")
 
     def hourly_forecasts(self, locations: Sequence[LatLon], forecast_hours: int) -> list[HourlyForecast]:
         """``forecast_hours`` is ignored: HERE always returns its full 168-hour series."""
@@ -57,14 +60,14 @@ class HereWeatherForecaster:
             raise ProviderConfigError(PROVIDER, "HERE_API_KEY is not configured")
         if not locations:
             return []
-        pool = ThreadPoolExecutor(max_workers=min(self.concurrency, len(locations)))
         futures: list[Future[HourlyForecast | ProviderError]] = [
-            pool.submit(self._fetch, location) for location in locations
+            self._pool.submit(self._fetch, location) for location in locations
         ]
         wait(futures, timeout=self.deadline_s)
         # Do not wait for stragglers: queued lookups are cancelled, running ones end within their own
         # HTTP budget in the background.
-        pool.shutdown(wait=False, cancel_futures=True)
+        for future in futures:
+            future.cancel()
         late = ProviderTimeout(PROVIDER, f"weather lookups exceeded {self.deadline_s:.0f} s")
         outcomes = [
             future.result() if future.done() and not future.cancelled() else late for future in futures

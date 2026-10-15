@@ -8,13 +8,14 @@ relative to "now".
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
 from routing.domain.forecast import HourlyForecast
 from routing.domain.geometry import LatLon
-from routing.providers.base import Forecaster
+from routing.providers.base import Forecaster, GeocodedPlace, Geocoder, ProviderRoute, TruckRouter
 
 GRID_DEGREES = 0.05
 HOUR_BUCKETS = (72, 168, 384)
@@ -66,3 +67,58 @@ class CachedForecaster:
             self.cache.set_many({k: f for k, f in fresh.items() if f.times}, timeout=self.timeout_s)
             found.update(fresh)
         return [found[keys[point]] for point in snapped]
+
+
+GEOCODE_TIMEOUT_S = 24 * 60 * 60  # place coordinates do not change within a day
+
+
+class CachedGeocoder:
+    """Caches successful lookups by normalised query; misses are not cached."""
+
+    def __init__(self, inner: Geocoder, cache: Any, timeout_s: int = GEOCODE_TIMEOUT_S) -> None:
+        self.inner = inner
+        self.cache = cache
+        self.timeout_s = timeout_s
+
+    def geocode(self, query: str) -> GeocodedPlace:
+        digest = hashlib.sha256(" ".join(query.lower().split()).encode()).hexdigest()
+        key = f"geocode:{digest}"
+        found: GeocodedPlace | None = self.cache.get(key)
+        if found is not None:
+            return found
+        place = self.inner.geocode(query)
+        self.cache.set(key, place, timeout=self.timeout_s)
+        return place
+
+
+class CachedRouter:
+    """Caches truck routes for an identical request (same points, departure, weight, alternatives)."""
+
+    def __init__(self, inner: TruckRouter, cache: Any, timeout_s: int) -> None:
+        self.inner = inner
+        self.description = inner.description
+        self.cache = cache
+        self.timeout_s = timeout_s
+
+    def truck_routes(
+        self,
+        origin: LatLon,
+        destination: LatLon,
+        departure: datetime,
+        weight_kg: int,
+        alternatives: int,
+    ) -> list[ProviderRoute]:
+        parts = (
+            f"{origin[0]:.5f},{origin[1]:.5f}",
+            f"{destination[0]:.5f},{destination[1]:.5f}",
+            departure.astimezone(UTC).isoformat(),
+            str(weight_kg),
+            str(alternatives),
+        )
+        key = "route:" + hashlib.sha256("|".join(parts).encode()).hexdigest()
+        found: list[ProviderRoute] | None = self.cache.get(key)
+        if found is not None:
+            return found
+        routes = self.inner.truck_routes(origin, destination, departure, weight_kg, alternatives)
+        self.cache.set(key, routes, timeout=self.timeout_s)
+        return routes

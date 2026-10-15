@@ -51,6 +51,7 @@ Open-Meteo (`open-meteo`, verified in docs and a recorded response):
 - `wind_speed_10m` is instantaneous: interpolate linearly between the bracketing hours (exact hour → that value).
 - `rain`, `showers`, `snowfall` are preceding-hour totals: use the first hourly timestamp >= ETA; never interpolate. Rain = `rain + showers`.
 - ETA outside the series, or a null value → that variable is unavailable.
+- Provider adapters are long-lived (one per configuration, built in `providers/factory.py`) so HTTP connections and weather worker threads are reused; geocoding (24 h) and truck routes (per identical request, `CACHE_TIMEOUT_S`) are cached too.
 - Cache: locations snap to a 0.05° grid; the full hourly series is cached per cell, current UTC hour and hour bucket (72/168/384), so caching never changes which hour an ETA reads. Free tier: 600 locations/min, 10,000/day.
 
 ## Checkpoints and ETA
@@ -58,6 +59,7 @@ Open-Meteo (`open-meteo`, verified in docs and a recorded response):
 - For spacing S in {10, 25, 50}: sample 0, S, 2S, … and the total distance, merging a final sample within epsilon of the end. Interpolate positions along the polyline. Sample each route once and reuse the positions.
 - ETA = departure (UTC) + elapsed time at the sample distance. Build a (distance, elapsed) curve from HERE spans (`spans=duration,length`; `offset` indexes the section polyline). Section summary time not covered by spans becomes a stop at the section start; span time above the summary is scaled down to it. Missing or malformed spans → proportional `duration × d / distance` with `eta_method="proportional"` disclosed.
 - Weather is looked up at each (lat, lon, ETA), never at departure time for all checkpoints.
+- The response's route `geometry` is simplified for display (Douglas–Peucker, ~20 m); sampling, ETAs and mileage always use the full polyline.
 - Mileage: each checkpoint owns the interval between midpoints to its neighbours, capped to [0, total]; intervals partition the route. Sum miles per severity plus Unknown miles; never count checkpoints as miles.
 - Weighted average risk = Σ(known interval miles × severity) / known miles (null if no known miles).
 

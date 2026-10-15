@@ -49,3 +49,41 @@ def point_at_distance(points: Sequence[LatLon], cumulative: Sequence[float], dis
     fraction = 0.0 if end == start else (distance - start) / (end - start)
     (lat1, lon1), (lat2, lon2) = points[index - 1], points[index]
     return (lat1 + (lat2 - lat1) * fraction, lon1 + (lon2 - lon1) * fraction)
+
+
+def simplify(points: Sequence[LatLon], tolerance_deg: float) -> list[LatLon]:
+    """Douglas–Peucker simplification for display: keeps the endpoints and every point that deviates
+    more than ``tolerance_deg`` from the simplified line. Distances use longitude scaled by
+    cos(latitude) so the tolerance is roughly uniform on the ground.
+
+    Only for drawing: sampling, ETAs and scoring always use the full geometry.
+    """
+    if len(points) < 3:
+        return list(points)
+    scale = math.cos(math.radians(sum(lat for lat, _ in points) / len(points)))
+
+    def deviation(point: LatLon, start: LatLon, end: LatLon) -> float:
+        py, px = point[0], point[1] * scale
+        ay, ax = start[0], start[1] * scale
+        by, bx = end[0], end[1] * scale
+        dx, dy = bx - ax, by - ay
+        length_sq = dx * dx + dy * dy
+        if length_sq == 0:
+            return math.hypot(px - ax, py - ay)
+        t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length_sq))
+        return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+    keep = [False] * len(points)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(points) - 1)]
+    while stack:
+        first, last = stack.pop()
+        worst, worst_index = 0.0, -1
+        for index in range(first + 1, last):
+            distance = deviation(points[index], points[first], points[last])
+            if distance > worst:
+                worst, worst_index = distance, index
+        if worst > tolerance_deg:
+            keep[worst_index] = True
+            stack.extend(((first, worst_index), (worst_index, last)))
+    return [point for point, kept in zip(points, keep, strict=True) if kept]

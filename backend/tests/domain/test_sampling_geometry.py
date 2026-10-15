@@ -79,3 +79,28 @@ def test_unit_conversions():
     assert lb_to_kg(80_000) == 36_287
     assert lb_to_kg(30_000) == 13_608
     assert meters_to_miles(1609.344) == pytest.approx(1.0)
+
+
+def test_simplify_keeps_endpoints_and_drops_collinear_points():
+    from routing.domain.geometry import simplify
+
+    line = [(40.0, -100.0 + i * 0.001) for i in range(1001)]  # straight east-west line
+    assert simplify(line, 0.0002) == [line[0], line[-1]]
+
+
+def test_simplify_keeps_real_corners_within_tolerance():
+    from routing.domain.geometry import simplify
+
+    corner = [(40.0, -100.0 + i * 0.01) for i in range(101)] + [
+        (40.0 + i * 0.01, -99.0) for i in range(1, 101)
+    ]
+    simplified = simplify(corner, 0.0002)
+    assert simplified[0] == corner[0] and simplified[-1] == corner[-1]
+    assert (40.0, -99.0) in simplified  # the corner survives
+    assert len(simplified) == 3
+
+
+def test_simplify_short_lines_unchanged():
+    from routing.domain.geometry import simplify
+
+    assert simplify([(1.0, 2.0), (3.0, 4.0)], 0.0002) == [(1.0, 2.0), (3.0, 4.0)]

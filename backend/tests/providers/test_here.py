@@ -151,3 +151,41 @@ def test_span_time_longer_than_summary_is_scaled_to_summary(client_factory):
     route_a, _ = call_routes(client_factory)
     assert route_a.timing_segments is not None
     assert sum(seconds for _, seconds in route_a.timing_segments) == pytest.approx(route_a.duration_seconds)
+
+
+def test_route_and_geocode_caches_serve_repeats():
+    from django.core.cache import caches
+
+    from routing.providers.base import GeocodedPlace
+    from routing.providers.cache import CachedGeocoder, CachedRouter
+
+    cache = caches["default"]
+    cache.clear()
+
+    class CountingGeocoder:
+        calls = 0
+
+        def geocode(self, query):
+            CountingGeocoder.calls += 1
+            return GeocodedPlace(query, 41.0, -87.0)
+
+    class CountingRouter:
+        description = "counting"
+        calls = 0
+
+        def truck_routes(self, origin, destination, departure, weight_kg, alternatives):
+            CountingRouter.calls += 1
+            return []
+
+    geocoder = CachedGeocoder(CountingGeocoder(), cache)
+    geocoder.geocode("Chicago, IL")
+    geocoder.geocode("  chicago,   il ")  # same place after normalising case and spaces
+    assert CountingGeocoder.calls == 1
+
+    router = CachedRouter(CountingRouter(), cache, timeout_s=60)
+    router.truck_routes((41.0, -87.0), (39.7, -105.0), DEPARTURE, 34_019, 2)
+    router.truck_routes((41.0, -87.0), (39.7, -105.0), DEPARTURE, 34_019, 2)
+    router.truck_routes((41.0, -87.0), (39.7, -105.0), DEPARTURE, 40_000, 2)  # different weight
+    assert CountingRouter.calls == 2
+    assert router.description == "counting"
+    cache.clear()

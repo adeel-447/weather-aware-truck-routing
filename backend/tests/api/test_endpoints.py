@@ -353,3 +353,21 @@ def test_factory_selects_here_weather(settings):
 
 def test_response_names_the_weather_source(providers):
     assert post(EVALUATE, VALID).json()["provider"]["weather"] == "Fake hourly forecast"
+
+
+def test_factory_reuses_adapters_for_the_same_configuration(settings):
+    from routing.providers.factory import get_forecaster, get_geocoder, get_router
+
+    settings.WEATHER_PROVIDER = "here"
+    assert get_forecaster() is get_forecaster()
+    assert get_router() is get_router()
+    assert get_geocoder() is get_geocoder()
+    settings.HERE_WEATHER_CONCURRENCY = 3  # a different configuration gets its own adapter
+    assert get_forecaster() is not factory_forecaster_before(settings)
+
+
+def factory_forecaster_before(settings):
+    from routing.providers.factory import get_forecaster
+
+    settings.HERE_WEATHER_CONCURRENCY = 12
+    return get_forecaster()

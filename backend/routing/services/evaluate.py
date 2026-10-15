@@ -7,13 +7,14 @@ still returned with every checkpoint Unknown, so nothing is presented as safe.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from routing.domain.checkpoints import build_checkpoints, sample_positions
 from routing.domain.eta import TimingCurve, arrival_at
 from routing.domain.forecast import HourlyForecast, forecast_hours_needed, weather_at
-from routing.domain.geometry import LatLon
+from routing.domain.geometry import LatLon, simplify
 from routing.domain.ranking import RankedRoute, RouteScore, RouteStanding, recommend
 from routing.domain.scoring import summarize
 from routing.domain.types import Checkpoint, Severity, SeveritySummary, WeatherSample
@@ -33,6 +34,8 @@ from routing.services.serialization import iso_utc, round_or_none
 logger = logging.getLogger(__name__)
 
 LEGAL_GROSS_LIMIT_LB = 80_000
+# Route lines sent to the browser are simplified to ~20 m: invisible on the map, ~80% smaller payload.
+DISPLAY_TOLERANCE_DEG = 0.0002
 CORRIDOR_MAX_POINTS = 2000
 CORRIDOR_MIN_STEP_MILES = 5.0
 UNAVAILABLE = WeatherSample(None, None, None)
@@ -146,8 +149,11 @@ def evaluate_trip(
     trip: TripRequest, providers: Providers, settings: Settings, now: datetime | None = None
 ) -> EvaluatePayload:
     now = now or datetime.now(UTC)
-    origin = _resolve(trip.origin, providers.geocoder, "origin")
-    destination = _resolve(trip.destination, providers.geocoder, "destination")
+    # Origin and destination are independent lookups: resolve them concurrently.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        origin_lookup = pool.submit(_resolve, trip.origin, providers.geocoder, "origin")
+        destination_lookup = pool.submit(_resolve, trip.destination, providers.geocoder, "destination")
+        origin, destination = origin_lookup.result(), destination_lookup.result()
     if (round(origin.lat, 4), round(origin.lon, 4)) == (round(destination.lat, 4), round(destination.lon, 4)):
         # Either input may be the wrong one, so the error is shown under both.
         raise TripValidationError(
@@ -370,7 +376,9 @@ def _route_payload(
         "notices": route.notices,
         "geometry": {
             "type": "LineString",
-            "coordinates": [[round(lon, 5), round(lat, 5)] for lat, lon in route.points],
+            "coordinates": [
+                [round(lon, 5), round(lat, 5)] for lat, lon in simplify(route.points, DISPLAY_TOLERANCE_DEG)
+            ],
         },
         "checkpoints": [_checkpoint_payload(i, c) for i, c in enumerate(checkpoints)],
     }
