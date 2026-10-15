@@ -18,7 +18,7 @@ backend/                           Django + DRF API
   config/                          settings (env-driven), urls, wsgi
   routing/                         Django app: views, serializers, urls, error envelope
     domain/                        pure logic, no I/O: types, risk, sampling, eta, forecast, ranking, heatmap grid
-    providers/                     adapters: HERE routing/geocoding, Open-Meteo weather, HTTP client, cache
+    providers/                     adapters: HERE routing/geocoding/weather, Open-Meteo weather, HTTP client, cache
     services/                      orchestration: evaluate_trip, corridor_heatmap
   tests/                           pytest; domain, provider (recorded/synthetic fixtures), service and API tests
 frontend/                          React + TypeScript + Vite
@@ -35,7 +35,7 @@ Business logic belongs in `backend/routing/domain/`. Views and providers stay th
 - Frontend: React + TypeScript, Vite, MapLibre GL JS (OpenFreeMap style, no key), TanStack Query, accessible controls.
 - Backend: Django + DRF, typed service boundaries (dataclasses), pytest, ruff, mypy.
 - Providers sit behind replaceable adapters selected by env (`ROUTING_PROVIDER`, `GEOCODING_PROVIDER`, `WEATHER_PROVIDER`). All URLs, keys, timeouts and retry settings come from env; see `.env.example`.
-- Routing: HERE Routing API v8 (truck mode). Geocoding: HERE Geocoding & Search v7. Weather: Open-Meteo hourly forecast. Request parameters and verified response semantics are in the weather-routing skill.
+- Routing: HERE Routing API v8 (truck mode). Geocoding: HERE Geocoding & Search v7. Weather: HERE Destination Weather v3 in production (`WEATHER_PROVIDER=here`; Open-Meteo's free tier is blocked from Render's shared IPs), Open-Meteo as the keyless alternative. Request parameters and verified response semantics are in the weather-routing skill.
 - Do not invent API capabilities or response fields. When a detail is unverified, verify it against docs or a recorded live response before relying on it, and note it in README.
 - Backend owns checkpoints, risk, eligibility, ranking and normalized responses. Frontend only renders them; it never re-derives severity or eligibility.
 - Credentials stay server-side. No `VITE_*` variable may contain a secret.
@@ -50,7 +50,7 @@ Business logic belongs in `backend/routing/domain/`. Views and providers stay th
 - **ETA scope.** Driving time from the routing provider only; hours-of-service, fuel and rest stops are not modeled. Say so in README and UI.
 
 ## Required user inputs and outputs
-- Inputs: origin, destination, departure date/time with IANA timezone (default: browser timezone), cargo weight (lb), checkpoint spacing (10, 25 or 50 mi). Validate: origin ≠ destination, departure from 1 h ago to 14 days ahead, weight bounds, allowed spacing.
+- Inputs: origin, destination, departure date/time with IANA timezone (default: browser timezone), cargo weight (lb), checkpoint spacing (10, 25 or 50 mi). Validate: origin ≠ destination, departure from 1 h ago to 6 days ahead (HERE forecasts 7 days), weight bounds, allowed spacing.
 - Outputs: up to three distinct truck routes with geometry, distance, duration, arrival, ETA-based checkpoints (weather, severity, factors), miles per severity (incl. No Travel and Unknown), weighted average risk, eligibility, a lexicographic recommendation (Severe miles, High miles, average risk, duration, route ID) with a human-readable reason, and the corridor heatmap.
 
 ## Implementation discipline

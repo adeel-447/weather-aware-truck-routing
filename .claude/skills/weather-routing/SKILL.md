@@ -35,7 +35,17 @@ Combination and missing data:
 - Missing values are Unknown, not Low. If any variable is missing, the checkpoint is Unknown unless a known variable already yields No Travel.
 - Compare floats directly against the exact thresholds; never round before classifying. Gusts may be displayed, never scored.
 
-## Forecast semantics (Open-Meteo, verified in docs and a recorded response)
+## Forecast semantics
+Two adapters behind `WEATHER_PROVIDER`; both return `HourlyForecast` series in UTC.
+
+HERE Destination Weather v3 (`here`, production; verified in the OpenAPI spec and a recorded response):
+- `GET /v3/report?products=forecastHourly&location={lat},{lng}&units=imperial`; one location per request, fetched in parallel (`HERE_WEATHER_CONCURRENCY`, ≤ the HTTP pool size of 10).
+- Response `places[0].hourlyForecasts[0].forecasts[]`: 168 consecutive hours from the current hour; `time` is local ISO-8601 with offset → convert to UTC.
+- `windSpeed` mph (interpolated like any instantaneous value); `rainFall`, `snowFall` inches. The hour a precipitation value covers is undocumented, so each bucket = max(previous hour, this hour).
+- One failed location → empty series (Unknown, never cached); all failed → raise the provider error.
+- Horizon 7 days, hence departures are limited to 6 days ahead. Each location is one request against the HERE quota; heatmap defaults to 80 cells.
+
+Open-Meteo (`open-meteo`, verified in docs and a recorded response):
 - Request: `wind_speed_unit=mph`, `precipitation_unit=inch` (applies to snowfall too), `timezone=GMT`, `timeformat=unixtime`, `past_hours=2`, comma-separated multi-location (≤100 per request; a single location returns an object, several return a list). Validate `hourly_units` on every response.
 - Window: `forecast_hours` counts from the start of the current hour (max 384). Always size it with `forecast_hours_needed(latest, now)`; trailing nulls mean unavailable.
 - `wind_speed_10m` is instantaneous: interpolate linearly between the bracketing hours (exact hour → that value).
