@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from routing.domain.checkpoints import build_checkpoints, sample_positions
 from routing.domain.eta import TimingCurve, arrival_at
 from routing.domain.forecast import HourlyForecast, forecast_hours_needed, weather_at
-from routing.domain.geometry import LatLon, simplify
+from routing.domain.geometry import LatLon, cumulative_miles, simplify
 from routing.domain.ranking import RankedRoute, RouteScore, RouteStanding, recommend
 from routing.domain.scoring import summarize
 from routing.domain.types import Checkpoint, Severity, SeveritySummary, WeatherSample
@@ -131,7 +131,7 @@ def _fetch_forecasts(
     return dict(zip(locations, series, strict=True)), None
 
 
-def _corridor(routes: list[ProviderRoute]) -> list[LatLon]:
+def _corridor(routes: list[ProviderRoute], cumulative: dict[str, list[float]]) -> list[LatLon]:
     """Points along every route for the heatmap grid, at most CORRIDOR_MAX_POINTS in total.
 
     A route sampled at ``step`` yields at most distance/step + 2 points (origin and destination), so a
@@ -141,7 +141,8 @@ def _corridor(routes: list[ProviderRoute]) -> list[LatLon]:
     step = max(CORRIDOR_MIN_STEP_MILES, total / (CORRIDOR_MAX_POINTS - 2 * len(routes)))
     points: list[LatLon] = []
     for route in routes:
-        points.extend(p for _, p in sample_positions(route.points, route.distance_miles, step))
+        samples = sample_positions(route.points, route.distance_miles, step, cumulative[route.route_id])
+        points.extend(p for _, p in samples)
     return points
 
 
@@ -196,7 +197,12 @@ def evaluate_trip(
 
     # Pass 1: positions (sampled once per route) and the latest ETA, so weather is fetched in one batch.
     timings = {r.route_id: _timing(r) for r in routes}
-    positions = {r.route_id: sample_positions(r.points, r.distance_miles, trip.spacing_miles) for r in routes}
+    # Distance along each polyline is computed once and reused for checkpoints and the corridor.
+    cumulative = {r.route_id: cumulative_miles(r.points, r.distance_miles) for r in routes}
+    positions = {
+        r.route_id: sample_positions(r.points, r.distance_miles, trip.spacing_miles, cumulative[r.route_id])
+        for r in routes
+    }
     locations = [position for route_positions in positions.values() for _, position in route_positions]
     latest = max(
         [trip.departure.astimezone(UTC)]
@@ -260,7 +266,7 @@ def evaluate_trip(
         },
         "routes": route_payloads,
         "warnings": warnings,
-        "corridor": [[round(lon, 5), round(lat, 5)] for lat, lon in _corridor(routes)],
+        "corridor": [[round(lon, 5), round(lat, 5)] for lat, lon in _corridor(routes, cumulative)],
         "heatmap_reference_at": iso_utc(
             trip.departure.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
         ),

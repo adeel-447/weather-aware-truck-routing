@@ -52,8 +52,11 @@ def point_at_distance(points: Sequence[LatLon], cumulative: Sequence[float], dis
 
 
 def simplify(points: Sequence[LatLon], tolerance_deg: float) -> list[LatLon]:
-    """Douglas–Peucker simplification for display: keeps the endpoints and every point that deviates
-    more than ``tolerance_deg`` from the simplified line. Distances use longitude scaled by
+    """Simplify a polyline for display; endpoints are always kept.
+
+    Two passes, as in simplify-js: a linear pass drops points closer than ``tolerance_deg`` to the last
+    kept point, then Douglas–Peucker removes points within ``tolerance_deg`` of the simplified line.
+    The result stays within about twice the tolerance of the original. Longitude is scaled by
     cos(latitude) so the tolerance is roughly uniform on the ground.
 
     Only for drawing: sampling, ETAs and scoring always use the full geometry.
@@ -61,29 +64,45 @@ def simplify(points: Sequence[LatLon], tolerance_deg: float) -> list[LatLon]:
     if len(points) < 3:
         return list(points)
     scale = math.cos(math.radians(sum(lat for lat, _ in points) / len(points)))
+    tol_sq = tolerance_deg * tolerance_deg
 
-    def deviation(point: LatLon, start: LatLon, end: LatLon) -> float:
-        py, px = point[0], point[1] * scale
-        ay, ax = start[0], start[1] * scale
-        by, bx = end[0], end[1] * scale
-        dx, dy = bx - ax, by - ay
-        length_sq = dx * dx + dy * dy
-        if length_sq == 0:
-            return math.hypot(px - ax, py - ay)
-        t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length_sq))
-        return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+    # Pass 1 (linear): radial distance.
+    xs = [points[0][1] * scale]
+    ys = [points[0][0]]
+    kept = [0]
+    for index in range(1, len(points) - 1):
+        x, y = points[index][1] * scale, points[index][0]
+        dx, dy = x - xs[-1], y - ys[-1]
+        if dx * dx + dy * dy > tol_sq:
+            xs.append(x)
+            ys.append(y)
+            kept.append(index)
+    xs.append(points[-1][1] * scale)
+    ys.append(points[-1][0])
+    kept.append(len(points) - 1)
 
-    keep = [False] * len(points)
+    # Pass 2: Douglas–Peucker on the survivors, with squared distances inlined for speed.
+    keep = [False] * len(kept)
     keep[0] = keep[-1] = True
-    stack = [(0, len(points) - 1)]
+    stack = [(0, len(kept) - 1)]
     while stack:
         first, last = stack.pop()
+        ax, ay, bx, by = xs[first], ys[first], xs[last], ys[last]
+        dx, dy = bx - ax, by - ay
+        length_sq = dx * dx + dy * dy
         worst, worst_index = 0.0, -1
         for index in range(first + 1, last):
-            distance = deviation(points[index], points[first], points[last])
-            if distance > worst:
-                worst, worst_index = distance, index
-        if worst > tolerance_deg:
+            px, py = xs[index], ys[index]
+            if length_sq == 0:
+                ex, ey = px - ax, py - ay
+            else:
+                t = ((px - ax) * dx + (py - ay) * dy) / length_sq
+                t = 0.0 if t < 0 else 1.0 if t > 1 else t
+                ex, ey = px - (ax + t * dx), py - (ay + t * dy)
+            distance_sq = ex * ex + ey * ey
+            if distance_sq > worst:
+                worst, worst_index = distance_sq, index
+        if worst > tol_sq:
             keep[worst_index] = True
             stack.extend(((first, worst_index), (worst_index, last)))
-    return [point for point, kept in zip(points, keep, strict=True) if kept]
+    return [points[kept[i]] for i in range(len(kept)) if keep[i]]

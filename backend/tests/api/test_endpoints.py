@@ -371,3 +371,13 @@ def factory_forecaster_before(settings):
 
     settings.HERE_WEATHER_CONCURRENCY = 12
     return get_forecaster()
+
+
+def test_identical_trip_is_served_from_the_response_cache(providers):
+    first = post(EVALUATE, VALID).json()
+    calls = len(providers["router"].calls)
+    second = post(EVALUATE, VALID).json()
+    assert second == first
+    assert len(providers["router"].calls) == calls  # no provider work the second time
+    post(EVALUATE, {**VALID, "load_weight_lb": 20_000})  # a different trip is computed
+    assert len(providers["router"].calls) == calls + 1

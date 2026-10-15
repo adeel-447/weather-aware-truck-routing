@@ -104,3 +104,33 @@ def test_simplify_short_lines_unchanged():
     from routing.domain.geometry import simplify
 
     assert simplify([(1.0, 2.0), (3.0, 4.0)], 0.0002) == [(1.0, 2.0), (3.0, 4.0)]
+
+
+def test_sample_positions_reuses_precomputed_distances():
+    points = [(40.0, -100.0), (40.0, -99.0), (41.0, -99.0)]
+    cumulative = cumulative_miles(points, 120.0)
+    assert sample_positions(points, 120.0, 50, cumulative) == sample_positions(points, 120.0, 50)
+
+
+def test_simplify_stays_close_to_a_long_noisy_route():
+    import math
+
+    from routing.domain.geometry import simplify
+
+    route = [(40.0 + 0.3 * math.sin(i / 400), -100.0 + i * 0.0005) for i in range(10_000)]
+    simplified = simplify(route, 0.0002)
+    assert len(simplified) < len(route) / 5
+    # Every original point lies within ~2x the tolerance of the simplified line (checked at vertices
+    # of the original against the nearest simplified vertex segment by brute force on a sample).
+    scale = math.cos(math.radians(40.15))
+
+    def distance_to_line(point):
+        best = float("inf")
+        for (ay, ax), (by, bx) in zip(simplified, simplified[1:], strict=False):
+            ax, bx, px = ax * scale, bx * scale, point[1] * scale
+            dx, dy = bx - ax, by - ay
+            t = max(0.0, min(1.0, ((px - ax) * dx + (point[0] - ay) * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(px - (ax + t * dx), point[0] - (ay + t * dy)))
+        return best
+
+    assert max(distance_to_line(route[i]) for i in range(0, 10_000, 97)) <= 2 * 0.0002

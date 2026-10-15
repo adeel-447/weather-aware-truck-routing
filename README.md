@@ -76,7 +76,7 @@ npm run dev                     # http://localhost:5173, proxies /api to Django 
 ## Tests and checks
 ```bash
 cd backend
-.venv/bin/pytest                                   # 230 tests
+.venv/bin/pytest                                   # 233 tests
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy .                                   # strict
 .venv/bin/python manage.py check
@@ -97,8 +97,10 @@ Both parts deploy from this repository's `main` branch; every push redeploys the
 |---|---|
 | Root directory | `backend` |
 | Build command | `pip install -r requirements.txt` |
-| Start command | `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120` |
+| Start command | `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120` |
 | Health check path | `/api/health/` |
+
+One worker with threads keeps a single in-memory cache (several workers would each keep their own and miss each other's entries); the app mostly waits on HERE, so threads handle concurrent requests.
 
 Environment: `PYTHON_VERSION=3.12.3`, `DJANGO_SECRET_KEY` (generated), `DJANGO_DEBUG=false`, `DJANGO_ALLOWED_HOSTS` (the service host; Render's own host name is also trusted automatically), `CORS_ALLOWED_ORIGINS` (the frontend URL), `HERE_API_KEY`, `WEATHER_PROVIDER=here`.
 
@@ -143,7 +145,7 @@ Both endpoints are rate-limited per client because every call spends provider qu
 - **Weather** (`WEATHER_PROVIDER`):
   - **`here` (production):** HERE Destination Weather v3 hourly forecast with the same `HERE_API_KEY`. 168 hours from the current hour, wind in mph and rain/snow in inches. One location per request, fetched 12 at a time (`HERE_WEATHER_CONCURRENCY`, one HTTP session per worker thread) within an overall `HERE_WEATHER_DEADLINE_S` (60 s; locations not done by then are Unknown); the heatmap defaults to 80 cells on this provider. HERE does not document whether an hourly rain/snow value covers the hour before or after its timestamp, so the app uses the larger of the two neighbouring hours: risk can be overstated, never understated. A location that fails is Unknown; if every location fails, the request reports the provider error.
   - **`open-meteo`:** Open-Meteo hourly forecast, keyless for non-commercial use, up to 384 h ahead. Its free tier is counted per IP address and is exhausted on shared hosting IPs such as Render's, which is why production uses HERE.
-- **Caching and speed:** forecasts are cached per ~5 km grid cell and truck routes per identical request for `CACHE_TIMEOUT_S` (15 min); geocoding results for 24 h. Failed lookups are never cached. A repeated trip returns in well under a second. Provider clients and the weather worker threads live for the whole process, so HTTPS connections are reused instead of re-negotiated on every request, and origin and destination are geocoded in parallel. Route lines sent to the browser are simplified to about 20 m (≈80% smaller responses); checkpoints, ETAs and scoring always use the full geometry.
+- **Caching and speed:** forecasts are cached per ~5 km grid cell and truck routes per identical request for `CACHE_TIMEOUT_S` (15 min); geocoding results for 24 h. Failed lookups are never cached. An identical trip within that window is answered from a response cache without any provider calls or recomputation. Provider clients and the weather worker threads live for the whole process, so HTTPS connections are reused instead of re-negotiated on every request, and origin and destination are geocoded in parallel. Route lines sent to the browser are simplified to about 20 m (≈80% smaller responses); checkpoints, ETAs and scoring always use the full geometry.
 - Provider calls have timeouts, at most 2 retries (timeouts, connection errors, 5xx, rate limits with a short Retry-After) and a 20 s budget per call. TLS and URL errors fail fast. Without `HERE_API_KEY`, requests return a clear 503 "not configured" error.
 - **Map tiles:** OpenFreeMap (no key).
 - All settings are listed in `.env.example`.

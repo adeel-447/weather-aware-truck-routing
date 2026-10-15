@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,12 +30,17 @@ class EvaluateRoutesView(APIView):
             spacing_miles=data["checkpoint_spacing_miles"],
             departure_ambiguous=data["departure_ambiguous"],
         )
-        providers = Providers(factory.get_geocoder(), factory.get_router(), factory.get_forecaster())
-        result = evaluate_trip(
-            trip,
-            providers,
-            Settings(empty_truck_lb=settings.TRUCK_EMPTY_WEIGHT_LB, alternatives=settings.ROUTE_ALTERNATIVES),
+        trip_settings = Settings(
+            empty_truck_lb=settings.TRUCK_EMPTY_WEIGHT_LB, alternatives=settings.ROUTE_ALTERNATIVES
         )
+        # An identical trip within the cache window returns the stored result: no provider calls
+        # and no recomputation (CPU is the bottleneck on small instances once providers are cached).
+        key = "evaluate:" + hashlib.sha256(repr((trip, trip_settings)).encode()).hexdigest()
+        result = cache.get(key)
+        if result is None:
+            providers = Providers(factory.get_geocoder(), factory.get_router(), factory.get_forecaster())
+            result = evaluate_trip(trip, providers, trip_settings)
+            cache.set(key, result, timeout=settings.CACHE_TIMEOUT_S)
         return Response(result)
 
 

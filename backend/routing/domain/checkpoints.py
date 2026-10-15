@@ -16,10 +16,17 @@ WeatherLookup = Callable[[float, float, datetime], WeatherSample]
 
 
 def sample_positions(
-    points: Sequence[LatLon], total_miles: float, spacing_miles: float
+    points: Sequence[LatLon],
+    total_miles: float,
+    spacing_miles: float,
+    cumulative: Sequence[float] | None = None,
 ) -> list[tuple[float, LatLon]]:
-    """(distance, position) for each checkpoint, interpolated along the route polyline."""
-    cumulative = cumulative_miles(points, total_miles)
+    """(distance, position) for each checkpoint, interpolated along the route polyline.
+
+    Pass ``cumulative`` (from :func:`cumulative_miles`) to reuse it when sampling a route twice.
+    """
+    if cumulative is None:
+        cumulative = cumulative_miles(points, total_miles)
     return [
         (d, point_at_distance(points, cumulative, d))
         for d in checkpoint_distances(total_miles, spacing_miles)
