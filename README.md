@@ -6,7 +6,7 @@ React + Django app that helps a truck driver choose the safest route. It compare
 |---|---|
 | **Live app** | https://weather-aware-truck-routing-1-fw4m.onrender.com |
 | **API** | https://weather-aware-truck-routing-ypg8.onrender.com/api/health/ |
-| **Demo video** | _Loom walkthrough: link coming soon_ |
+| **Demo video** | [Loom walkthrough](https://www.loom.com/share/c8db8b6e42074b92b2a190660d23afe9) |
 
 > The API runs on Render's free tier, which sleeps after ~15 minutes idle. The first request after that can take 30–60 s; open the API health link once to wake it.
 
